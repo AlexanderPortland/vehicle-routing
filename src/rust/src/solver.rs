@@ -3,14 +3,14 @@ use std::collections::HashSet;
 use crate::VRPInstance;
 
 pub struct Stop {
-    pub customer_id: usize,
-    pub capacity: usize,
+    pub customer_idx: usize,
+    pub demand: usize,
 }
 
 pub struct Route {
     pub stops: Vec<u16>,
     pub known_cost: Option<f64>,
-    pub capacity: usize,
+    pub capacity_left: usize,
 }
 
 impl Route {
@@ -62,10 +62,10 @@ impl VRPSolution {
         VRPSolution {
             routes: (0..vrp_instance.num_vehicles)
                 .into_iter()
-                .map(|i| Route {
+                .map(|_| Route {
                     stops: Vec::with_capacity(vrp_instance.num_customers),
                     known_cost: Some(0f64),
-                    capacity: vrp_instance.vehicle_capacity,
+                    capacity_left: vrp_instance.vehicle_capacity,
                 })
                 .collect(),
         }
@@ -74,11 +74,13 @@ impl VRPSolution {
     pub fn greedy_construction(&mut self, vrp_instance: &VRPInstance) {
         let mut vehicle_index = 0;
         for i in 0..vrp_instance.num_customers {
-            if self.routes[vehicle_index].capacity < vrp_instance.demand_of_customer[i] {
+            let demand = vrp_instance.demand_of_customer[i];
+            let customer_idx = i;
+            if self.routes[vehicle_index].capacity_left < demand {
                 vehicle_index += 1;
             }
             assert!(vehicle_index <= self.routes.len());
-            self.routes[vehicle_index].add_stop_to_end(Stop { index: (), capacity: () });
+            self.routes[vehicle_index].add_stop_to_end(Stop { customer_idx: i, demand: () });
         }
     }
 
