@@ -3,6 +3,8 @@ use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 use std::process;
 
+use crate::common::DistanceMatrix;
+
 pub struct VRPInstance {
     pub num_customers: usize,
     pub num_vehicles: usize,
@@ -10,7 +12,7 @@ pub struct VRPInstance {
     pub demand_of_customer: Vec<usize>,
     pub x_coord_of_customer: Vec<f64>,
     pub y_coord_of_customer: Vec<f64>,
-    pub distance_matrix: Vec<Vec<f64>>,
+    pub distance_matrix: DistanceMatrix,
 }
 
 impl VRPInstance {
@@ -108,7 +110,7 @@ impl VRPInstance {
             demand_of_customer,
             x_coord_of_customer,
             y_coord_of_customer,
-            distance_matrix
+            distance_matrix: DistanceMatrix::new(distance_matrix)
         }
     }
 
