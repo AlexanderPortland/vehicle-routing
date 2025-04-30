@@ -3,14 +3,14 @@ use std::collections::HashSet;
 use crate::VRPInstance;
 
 pub struct Stop {
-    pub index: usize,
-    pub capacity: usize
+    pub customer_id: usize,
+    pub capacity: usize,
 }
 
 pub struct Route {
     pub stops: Vec<u16>,
     pub known_cost: Option<f64>,
-    pub capacity: usize
+    pub capacity: usize,
 }
 
 impl Route {
@@ -30,7 +30,7 @@ impl Route {
     }
 
     pub fn contains_stop(&self, stop: u16) -> bool {
-        self.stops.iter().any(|a|{ *a == stop })
+        self.stops.iter().any(|a| *a == stop)
     }
 
     pub fn assert_sanity(&self) {
@@ -54,52 +54,62 @@ impl Route {
 }
 
 struct VRPSolution {
-    routes: Vec<Route>
+    routes: Vec<Route>,
 }
 
 impl VRPSolution {
-    pub fn new(vrp_instance: VRPInstance) -> Self {
-        VRPSolution { 
-            routes: (0..vrp_instance.num_vehicles).into_iter().map(
-                |i| Route { stops: Vec::with_capacity(vrp_instance.num_customers), known_cost: Some(0f64) }
-            ).collect()
+    pub fn new(vrp_instance: &VRPInstance) -> Self {
+        VRPSolution {
+            routes: (0..vrp_instance.num_vehicles)
+                .into_iter()
+                .map(|i| Route {
+                    stops: Vec::with_capacity(vrp_instance.num_customers),
+                    known_cost: Some(0f64),
+                    capacity: vrp_instance.vehicle_capacity,
+                })
+                .collect(),
+        }
+    }
+
+    pub fn greedy_construction(&mut self, vrp_instance: &VRPInstance) {
+        let mut vehicle_index = 0;
+        for i in 0..vrp_instance.num_customers {
+            if self.routes[vehicle_index].capacity < vrp_instance.demand_of_customer[i] {
+                vehicle_index += 1;
+            }
+            assert!(vehicle_index <= self.routes.len());
+            self.routes[vehicle_index].add_stop_to_end(Stop { index: (), capacity: () });
         }
     }
 
     pub fn calculate_cost(&mut self, distance_matrix: &Vec<Vec<f64>>) -> f64 {
-        self.routes.iter_mut().map(|route|{
-            if let Some(known) = route.known_cost {
-                known
-            } else {
-                let route_cost = route.calc_route_cost(distance_matrix);
-                route.known_cost = Some(route_cost);
-                route_cost
-            }
-        }).sum()
+        self.routes
+            .iter_mut()
+            .map(|route| {
+                if let Some(known) = route.known_cost {
+                    known
+                } else {
+                    let route_cost = route.calc_route_cost(distance_matrix);
+                    route.known_cost = Some(route_cost);
+                    route_cost
+                }
+            })
+            .sum()
     }
 }
 
 struct Solver {
-    vrp_instance: VRPInstance
+    vrp_instance: VRPInstance,
 }
-
 
 impl Solver {
     pub fn new(vrp_instance: VRPInstance) -> Self {
-        Solver {
-            vrp_instance
-        }
+        Solver { vrp_instance }
     }
 
-    pub fn construct() {
-        
-    }
+    pub fn construct() {}
 
-    pub fn perturb() {
+    pub fn perturb() {}
 
-    }
-
-    pub fn solve() {
-
-    }
+    pub fn solve() {}
 }
