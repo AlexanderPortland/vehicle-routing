@@ -2,6 +2,11 @@ use std::collections::HashSet;
 
 use crate::VRPInstance;
 
+pub struct Stop {
+    pub index: usize,
+    pub capacity: usize
+}
+
 pub struct Route {
     pub stops: Vec<u16>,
     pub known_cost: Option<f64>,
@@ -39,15 +44,12 @@ impl Route {
         assert!(existing.len() == self.stops.len());
     }
 
-    pub fn add_stop_to_end(&mut self, stop: u16) {
-        assert!(!self.contains_stop(stop));
-        self.stops.push(stop);
-        self.capacity += 
+    pub fn add_stop_to_end(&mut self, stop: Stop) {
+        todo!()
     }
 
-    pub fn add_stop_to_index(&mut self, stop: u16, index: usize) {
-        assert!(index <= self.stops.len());
-        self.stops.insert(index, stop);
+    pub fn add_stop_to_index(&mut self, stop: Stop, index: usize) {
+        todo!()
     }
 }
 
