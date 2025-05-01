@@ -71,9 +71,15 @@ impl<'a> Route<'a> {
         todo!()
     }
 
+    fn speculative_add_stop(&self, stop: Stop, index: usize) {
+
+    }
+
+    // 0,      1,        2,      
     // 0 -> stop[0] -> stop[1] -...-> stop[len - 1] -> 0
     /// The cost of going from the previous index to `index`. (if `index` == `len`, cost of going home after...)
     pub fn cost_at_index(&self, index: usize) -> f64 {
+        let index = index;
         assert!(index <= self.stops.len());
 
         let start = self.stops.get(index - 1).map(|s|s.cust_no).or(Some(0)).unwrap();
@@ -85,7 +91,7 @@ impl<'a> Route<'a> {
     /// If you give an index in the full, real route (NOT SELF.STOPS)
     pub fn cust_no_at_index(&self, index: usize) -> f64 {
         assert!(index <= self.stops.len() + 1);
-        
+
     }
 
     pub fn remove_at_index(&mut self, index: usize) -> Stop {
