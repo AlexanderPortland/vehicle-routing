@@ -6,6 +6,7 @@ use rand::Rng;
 #[derive(Debug, Clone)]
 struct VRPSolution<'a> {
     routes: Vec<Route<'a>>,
+    // routes_before_destroy: Vec<Route<'a>>,
 }
 
 impl<'a> VRPSolution<'a> {
@@ -142,42 +143,58 @@ impl<'a> Solver<'a> {
 
         println!("solver is {:?}", self.vrp_solution);
         // let mut temperature = self.calculate_initial_temperature();
-        let alpha = 0.98;
 
         let mut best = self.vrp_solution.clone();
         // let mut current_solution = self.vrp_solution;
         for _ in 0..1000 {
-            let old_solution = self.vrp_solution.clone();
-            let stop = self.random_destroy();
-            if !self.random_repair(stop) {
-                // println!("")x
-                self.vrp_solution = old_solution;
-                continue;
-            }
+            // look at best thing to remove, and best place to put it
+            let rem = self.remove_worst_stop();
+            self.reinsert_in_best_spot(rem);
 
-            let new_cost = self.vrp_solution.cost();
-
-            if new_cost < best.cost() {
-                println!("new best w/ cost {:?}", new_cost);
+            if self.vrp_solution.cost() < best.cost() {
+                println!("FOUND NEW BEST IM THE GOAT {:?}", self.vrp_solution.cost());
                 best = self.vrp_solution.clone();
-                // incumbent_cost = best.cost();
             } else {
-                println!("NOT NEW best w/ shitty cost {:?}", new_cost);
+                println!("didn't find a new best im not really that good ... :( {:?}", self.vrp_solution.cost());
             }
-
-            let delta = new_cost - incumbent_cost;
-            if delta < 0f64 || rand::random::<f64>() < 0.02_f64 {
-                // current_solution = candidate; // accept move
-                // accept move
-                println!("accepting move to {:?}", self.vrp_solution);
-                incumbent_cost = self.vrp_solution.cost();
-            } else {
-                println!("reverting back to {:?}", self.vrp_solution);
-                self.vrp_solution = old_solution;
-            }
-            // temperature *= alpha;
         }
 
         println!("solver is {:?}", best);
+    }
+
+    fn remove_worst_stop(&mut self) -> Stop {
+        println!("removing worst stop from {:?}", self.vrp_solution);
+
+        let (mut worst_spot_r, mut worst_spot_i, worst_spot_cost) = (100000, 100000, f64::MAX);
+
+        for (r, route) in self.vrp_solution.routes.iter().enumerate() {
+            for i in 0..(route.stops().len() + 1) {
+                let (cost, feas) = route.speculative_remove_stop(i);
+                if feas && cost < worst_spot_cost {
+                    (worst_spot_r, worst_spot_i) = (r, i);
+                }
+            }
+        }
+
+        let res = self.vrp_solution.routes[worst_spot_r].remove_stop(worst_spot_i);
+
+        println!("best was to remove from {:?} @ {:?}", self.vrp_solution.routes[worst_spot_r], worst_spot_i);
+        return res;
+    }
+
+    fn reinsert_in_best_spot(&mut self, stop: Stop) {
+        let (mut best_spot_r, mut best_spot_i, best_spot_cost) = (100000, 100000, f64::MAX);
+
+        for (r, route) in self.vrp_solution.routes.iter().enumerate() {
+            for i in 0..(route.stops().len() + 1) {
+                let (cost, feas) = route.speculative_add_stop(&stop, i);
+                if feas && cost < best_spot_cost {
+                    (best_spot_r, best_spot_i) = (r, i);
+                }
+            }
+        }
+
+        println!("best was to add {:?} to {:?} @ {:?}", stop, self.vrp_solution.routes[best_spot_r], best_spot_i);
+        self.vrp_solution.routes[best_spot_r].add_stop_to_index(stop, best_spot_i);
     }
 }
