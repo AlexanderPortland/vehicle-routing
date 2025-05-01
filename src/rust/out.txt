@@ -1,0 +1,37 @@
+0 30 40
+19 42 41
+29 31 32
+23 5 25
+21 12 42
+10 36 16
+15 52 41
+3 27 23
+41 17 33
+9 13 13
+28 57 58
+8 62 42
+8 42 57
+16 16 57
+10 8 52
+28 7 38
+7 27 68
+15 30 48
+14 43 67
+6 58 48
+19 58 27
+res for adding Stop(1) to r0[] (@0) is (24.08318915758459, true)
+res for adding Stop(2) to r0[1] (@1) is (34.31652273064274, true)
+res for adding Stop(3) to r0[1 -> 2] (@2) is (82.33484849224321, true)
+res for adding Stop(4) to r1[] (@0) is (36.22154055254967, true)
+res for adding Stop(5) to r1[4] (@1) is (78.23301605588907, true)
+res for adding Stop(6) to r1[4 -> 5] (@2) is (105.19874200704, true)
+res for adding Stop(7) to r1[4 -> 5 -> 6] (@3) is (131.24454656462555, true)
+res for adding Stop(8) to r2[] (@0) is (29.5296461204668, true)
+res for adding Stop(9) to r2[8] (@1) is (67.06701338169218, true)
+res for adding Stop(10) to r2[8 -> 9] (@2) is (130.54733850401868, true)
+res for adding Stop(11) to r3[] (@0) is (64.1248781675256, true)
+res for adding Stop(12) to r3[11] (@1) is (77.87109113044761, true)
+res for adding Stop(13) to r3[11 -> 12] (@2) is (105.08515462930804, true)
+res for adding Stop(14) to r3[11 -> 12 -> 13] (@3) is (117.55634838810273, true)
+res for adding Stop(15) to r3[11 -> 12 -> 13 -> 14] (@4) is (129.618881824668, true)
+res for adding Stop(16) to r3[11 -> 12 -> 13 -> 14 -> 15] (@5) is (170.74785749873496, true)
