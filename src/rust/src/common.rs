@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use crate::vrp_instance::VRPInstance;
+
 pub struct DistanceMatrix(Vec<Vec<f64>>);
 
 impl DistanceMatrix {
@@ -22,15 +24,15 @@ impl Stop {
 }
 
 pub struct Route<'a> {
-    distance_matrix: &'a DistanceMatrix,
+    instance: &'a VRPInstance,
     stops: Vec<Stop>,
     cost: f64,
     used_cap: usize
 }
 
 impl<'a> Route<'a> {
-    pub fn new(num_customers: usize, distance_matrix: &'a DistanceMatrix) -> Self {
-        Route { distance_matrix, stops: Vec::with_capacity(num_customers), cost: 0f64, used_cap: 0 }
+    pub fn new(num_customers: usize, instance: &'a VRPInstance) -> Self {
+        Route { instance, stops: Vec::with_capacity(num_customers), cost: 0f64, used_cap: 0 }
     }
 
     pub fn stops(&self) -> &Vec<Stop> { &self.stops }
@@ -43,7 +45,7 @@ impl<'a> Route<'a> {
     pub fn route_used_cap(&self) -> usize {
         self.assert_sanity(); // TODO: remove for debug
         self.used_cap
-    }
+    }c
 
     pub fn contains_stop(&self, cust_no: u16) -> bool {
         self.stops.iter().any(|a|{ a.cust_no == cust_no })
@@ -51,51 +53,91 @@ impl<'a> Route<'a> {
 
     pub fn add_stop_to_index(&mut self, stop: Stop, index: usize) {
         self.assert_sanity();
-
         assert!(index <= self.stops.len()); // should be less than stops.len()
         
-        // capacity just increases by the stop's capacity
-        self.used_cap += stop.capacity;
+        let cap = stop.capacity;
+        let (new_cost, _) = self.speculative_add_stop(&stop, index);
+        self.used_cap += cap;
+        self.cost = new_cost;
 
-        // cost will decrease by the two current ones being split up
-        let cost_dec = self.cost_at_index(index);
-
-        // and will increase by the two new paths we have to take...
-        let c = if let Some(t) = self.stops.first() {
-
-        } else { 0f64 };
-        let cost_inc = self.distance_matrix.dist(self.val, b)
-            + self.distance_matrix.dist(a, b);
+        self.stops.insert(index, stop);
 
         self.assert_sanity();
-        todo!()
     }
 
-    fn speculative_add_stop(&self, stop: Stop, index: usize) {
+    pub fn remove_stop(&mut self, index: usize) {
+        self.assert_sanity();
+        assert!(index <= self.stops.len()); // should be less than stops.len()
 
+        let (new_cost, _) = self.speculative_remove_stop(index);
+
+        let stop = self.stops.remove(index);
+        self.used_cap -= stop.capacity;
+        self.cost = new_cost;
+
+        self.assert_sanity();
     }
 
-    // 0,      1,        2,      
+    // the change in cost for how much adding 
+    pub fn speculative_add_stop(&self, stop: &Stop, index: usize) -> (f64, bool) {
+        self.assert_sanity();
+        assert!(index <= self.stops.len());
+
+        let mut new_cost = self.cost; // TODO: could change to be relative
+        new_cost -= self.cost_at_index(index);
+
+        let before = if index != 0 {
+            self.stops[index - 1].cust_no
+        } else { 0 };
+
+        let after = if index != self.stops.len() {
+            self.stops[index].cust_no
+        } else { 0 };
+
+        new_cost += self.instance.distance_matrix.dist(before, stop.cust_no);
+        new_cost += self.instance.distance_matrix.dist(stop.cust_no, after);
+
+        return (new_cost, self.used_cap + stop.capacity >= self.instance.vehicle_capacity);
+    }
+
+    pub fn speculative_remove_stop(&self, index: usize) -> (f64, bool) {
+        self.assert_sanity();
+        assert!(index <= self.stops.len());
+        // assert!(self.stops[index])
+        let stop = &self.stops[index];
+
+        let mut new_cost = self.cost; // TODO: could change to be relative
+        new_cost += self.cost_at_index(index);
+
+        let before = if index != 0 {
+            self.stops[index - 1].cust_no
+        } else { 0 };
+
+        let after = if index != self.stops.len() {
+            self.stops[index].cust_no
+        } else { 0 };
+
+        new_cost -= self.instance.distance_matrix.dist(before, stop.cust_no);
+        new_cost -= self.instance.distance_matrix.dist(stop.cust_no, after);
+
+        (new_cost, self.used_cap - self.stops[index].capacity >= self.instance.vehicle_capacity)
+    }
+
+    // -1      0         1
     // 0 -> stop[0] -> stop[1] -...-> stop[len - 1] -> 0
     /// The cost of going from the previous index to `index`. (if `index` == `len`, cost of going home after...)
     pub fn cost_at_index(&self, index: usize) -> f64 {
-        let index = index;
         assert!(index <= self.stops.len());
 
-        let start = self.stops.get(index - 1).map(|s|s.cust_no).or(Some(0)).unwrap();
-        let end = self.stops.get(index).map(|s|s.cust_no).or(Some(0)).unwrap();
+        let start = if index != 0 {
+            self.stops[index - 1].cust_no
+        } else { 0 };
 
-        self.distance_matrix.dist(start, end)
-    }
+        let end = if index != self.stops.len() {
+            self.stops[index].cust_no
+        } else { 0 };
 
-    /// If you give an index in the full, real route (NOT SELF.STOPS)
-    pub fn cust_no_at_index(&self, index: usize) -> f64 {
-        assert!(index <= self.stops.len() + 1);
-
-    }
-
-    pub fn remove_at_index(&mut self, index: usize) -> Stop {
-        todo!()
+        self.instance.distance_matrix.dist(start, end)
     }
 
     // *********** SANITY CHECKING SHIT ***********
@@ -110,12 +152,12 @@ impl<'a> Route<'a> {
         let mut cost = 0f64;
 
         for i in 1..self.stops.len() {
-            cost += self.distance_matrix.dist(self.stops[i - 1].cust_no, self.stops[i].cust_no);
+            cost += self.instance.distance_matrix.dist(self.stops[i - 1].cust_no, self.stops[i].cust_no);
         }
 
         if self.stops.len() > 0 {
-            cost += self.distance_matrix.dist(0, self.stops[0].cust_no);
-            cost += self.distance_matrix.dist(self.stops[self.stops.len() - 1].cust_no, 0);
+            cost += self.instance.distance_matrix.dist(0, self.stops[0].cust_no);
+            cost += self.instance.distance_matrix.dist(self.stops[self.stops.len() - 1].cust_no, 0);
         }
 
         assert!(cost == self.cost);
