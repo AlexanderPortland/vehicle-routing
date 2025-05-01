@@ -18,6 +18,12 @@ pub struct Stop {
     capacity: usize
 }
 
+impl PartialEq for Stop {
+    fn eq(&self, other: &Self) -> bool {
+        self.cust_no == other.cust_no
+    }
+}
+
 impl std::fmt::Debug for Stop {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("Stop({})", self.cust_no))
@@ -122,7 +128,6 @@ impl<'a> Route<'a> {
         new_cost += self.instance.distance_matrix.dist(stop.cust_no, after);
 
         let res = (new_cost, self.used_cap + stop.capacity <= self.instance.vehicle_capacity);
-        println!("res for adding {:?} to {:?} (@{:?}) is {:?}", stop, self, index, res);
         return res;
     }
 
@@ -156,7 +161,7 @@ impl<'a> Route<'a> {
 
         // println!("spec remove for index {:?} of {:?} is {:?}", index, self, new_cost);
 
-        (new_cost, self.used_cap - self.stops[index].capacity >= self.instance.vehicle_capacity)
+        (new_cost, self.used_cap - self.stops[index].capacity <= self.instance.vehicle_capacity)
     }
 
     // -1      0         1
