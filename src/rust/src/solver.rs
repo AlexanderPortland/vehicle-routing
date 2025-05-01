@@ -1,7 +1,6 @@
-
-use rand::Rng;
 use crate::VRPInstance;
 use crate::common::{Route, Stop};
+use rand::Rng;
 
 struct VRPSolution<'a> {
     routes: Vec<Route<'a>>,
@@ -26,45 +25,32 @@ impl<'a> VRPSolution<'a> {
                 vehicle_index += 1;
             }
             assert!(vehicle_index <= self.routes.len());
-            self.routes[vehicle_index].add_stop_to_end(Stop {
-                customer_idx,
-                demand,
-            });
+            let len = self.routes[vehicle_index].stops().len();
+            self.routes[vehicle_index].add_stop_to_index(Stop::new(customer_idx.try_into().unwrap(), demand), len);
         }
     }
 
-    pub fn cost(&mut self, distance_matrix: &Vec<Vec<f64>>) -> f64 {
-        self.routes
-            .iter_mut()
-            .map(|route| {
-                if let Some(known) = route.known_cost {
-                    known
-                } else {
-                    let route_cost = route.cost(distance_matrix);
-                    route.known_cost = Some(route_cost);
-                    route_cost
-                }
-            })
-            .sum()
+    pub fn cost(&mut self) -> f64 {
+        self.routes.iter_mut().map(|route| route.route_cost()).sum()
     }
 
     pub fn print(self) {
         for route in self.routes {
-            for customer_idx in route.stops {
-                print!("{:>2} ", customer_idx);
+            for stop in route.stops() {
+                print!("{:>2} ", stop.cust_no());
             }
             println!();
         }
     }
 }
 
-pub struct Solver {
-    vrp_instance: VRPInstance,
-    vrp_solution: VRPSolution,
+pub struct Solver<'a> {
+    vrp_instance: &'a VRPInstance,
+    vrp_solution: VRPSolution<'a>,
 }
 
-impl Solver {
-    pub fn new(vrp_instance: VRPInstance) -> Self {
+impl<'a> Solver<'a> {
+    pub fn new(vrp_instance: &'a VRPInstance) -> Self {
         Solver {
             vrp_solution: VRPSolution::new(&vrp_instance),
             vrp_instance,
@@ -76,23 +62,23 @@ impl Solver {
             .get_greedy_construction(&self.vrp_instance);
     }
 
-    pub fn destroy(&mut self) -> Stop {
+    pub fn random_destroy(&mut self) -> Stop {
         let mut rng = rand::rng();
         let rand_vehicle_idx = rng.random_range(0..=self.vrp_instance.num_vehicles);
         let rand_route_idx =
-            rng.random_range(0..=self.vrp_solution.routes[rand_vehicle_idx].stops.len() - 1);
+            rng.random_range(0..=self.vrp_solution.routes[rand_vehicle_idx].stops().len() - 1);
 
         let removed_stop =
-            self.vrp_solution.routes[rand_vehicle_idx].remove_stop_at_index(rand_route_idx);
+            self.vrp_solution.routes[rand_vehicle_idx].remove_stop(rand_route_idx);
 
         return removed_stop;
     }
 
-    pub fn repair(&mut self, stop: Stop) {
+    pub fn random_repair(&mut self, stop: Stop) {
         let mut rng = rand::rng();
         let rand_vehicle_idx = rng.random_range(0..=self.vrp_instance.num_vehicles);
         let rand_route_idx =
-            rng.random_range(0..=self.vrp_solution.routes[rand_vehicle_idx].stops.len());
+            rng.random_range(0..=self.vrp_solution.routes[rand_vehicle_idx].stops().len());
 
         self.vrp_solution.routes[rand_vehicle_idx].add_stop_at_index(stop, rand_route_idx);
     }
@@ -107,12 +93,15 @@ impl Solver {
             let new_cost = self.vrp_solution.cost();
             if new_cost > cost {
                 let delta = new_cost - cost;
-                avg_delta_of_bad_moves = ((avg_delta_of_bad_moves * number_of_worse_moves as f64) + delta) / ((number_of_worse_moves + 1) as f64);
+                avg_delta_of_bad_moves = ((avg_delta_of_bad_moves * number_of_worse_moves as f64)
+                    + delta)
+                    / ((number_of_worse_moves + 1) as f64);
                 number_of_worse_moves += 1;
             }
         }
         let percentage_of_worse_moves: f64 = number_of_worse_moves as f64 / 1000f64;
-        return avg_delta_of_bad_moves / ((0.97 - 1f64 + percentage_of_worse_moves) / percentage_of_worse_moves).ln();
+        return avg_delta_of_bad_moves
+            / ((0.97 - 1f64 + percentage_of_worse_moves) / percentage_of_worse_moves).ln();
     }
 
     pub fn solve(&mut self) {
@@ -122,8 +111,8 @@ impl Solver {
         let alpha = 0.98;
 
         while temperature > 0.2 {
-            let stop = self.destroy();
-            self.repair(stop);
+            let stop = self.random_destroy();
+            self.random_repair(stop);
             let new_cost = self.vrp_solution.cost();
             let delta = new_cost - incumbent_cost;
             if delta < 0f64 || rand::<f64>() < (-delta / temperature).exp() {

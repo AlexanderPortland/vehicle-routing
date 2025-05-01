@@ -59,7 +59,7 @@ fn main() {
     // Create a new VRPInstance from the provided file
     let vrp_instance = VRPInstance::new(file_name);
     // test_route_cost(&vrp_instance);
-    let mut solver = Solver::new(vrp_instance);
+    let mut solver = Solver::new(&vrp_instance);
 
     solver.solve();
 }
