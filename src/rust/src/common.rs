@@ -31,8 +31,8 @@ pub struct Route<'a> {
 }
 
 impl<'a> Route<'a> {
-    pub fn new(num_customers: usize, instance: &'a VRPInstance) -> Self {
-        Route { instance, stops: Vec::with_capacity(num_customers), cost: 0f64, used_cap: 0 }
+    pub fn new(instance: &'a VRPInstance) -> Self {
+        Route { instance, stops: Vec::with_capacity(instance.num_customers), cost: 0f64, used_cap: 0 }
     }
 
     pub fn stops(&self) -> &Vec<Stop> { &self.stops }

@@ -3,20 +3,16 @@ use rand::Rng;
 use crate::VRPInstance;
 use crate::common::{Route, Stop};
 
-struct VRPSolution {
-    routes: Vec<Route>,
+struct VRPSolution<'a> {
+    routes: Vec<Route<'a>>,
 }
 
-impl VRPSolution {
-    pub fn new(vrp_instance: &VRPInstance) -> Self {
+impl<'a> VRPSolution<'a> {
+    pub fn new(vrp_instance: &'a VRPInstance) -> Self {
         VRPSolution {
             routes: (0..vrp_instance.num_vehicles)
                 .into_iter()
-                .map(|_| Route {
-                    stops: Vec::with_capacity(vrp_instance.num_customers),
-                    known_cost: Some(0f64),
-                    capacity_left: vrp_instance.vehicle_capacity,
-                })
+                .map(|_| Route::new(&vrp_instance))
                 .collect(),
         }
     }
@@ -26,7 +22,7 @@ impl VRPSolution {
         for i in 0..vrp_instance.num_customers {
             let demand = vrp_instance.demand_of_customer[i];
             let customer_idx = i;
-            if self.routes[vehicle_index].capacity_left < demand {
+            if self.routes[vehicle_index].route_used_cap() < demand {
                 vehicle_index += 1;
             }
             assert!(vehicle_index <= self.routes.len());

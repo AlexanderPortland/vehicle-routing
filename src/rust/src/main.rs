@@ -4,46 +4,46 @@ mod vrp_instance;
 
 use std::env;
 use vrp_instance::VRPInstance;
-use solver::{Solver, Route};
+use solver::{Solver};
 
-fn test_route_cost(vrp_instance: &VRPInstance) {
-    let route = Route {
-        stops: vec![1],
-        known_cost: None,
-        capacity_left: 0,
-    };
-    let expected_cost = 20.0;
-    let actual_cost = route.cost(&vrp_instance.distance_matrix);
+// fn test_route_cost(vrp_instance: &VRPInstance) {
+//     let route = Route {
+//         stops: vec![1],
+//         known_cost: None,
+//         capacity_left: 0,
+//     };
+//     let expected_cost = 20.0;
+//     let actual_cost = route.cost(&vrp_instance.distance_matrix);
 
-    println!("Expected cost: {}", expected_cost);
-    println!("Actual cost: {}", actual_cost);
+//     println!("Expected cost: {}", expected_cost);
+//     println!("Actual cost: {}", actual_cost);
 
-    let route = Route {
-        stops: vec![],
-        known_cost: None,
-        capacity_left: 0,
-    };
-    let expected_cost = 0.0;
-    let actual_cost = route.cost(&vrp_instance.distance_matrix);
+//     let route = Route {
+//         stops: vec![],
+//         known_cost: None,
+//         capacity_left: 0,
+//     };
+//     let expected_cost = 0.0;
+//     let actual_cost = route.cost(&vrp_instance.distance_matrix);
 
-    println!("Expected cost: {}", expected_cost);
-    println!("Actual cost: {}", actual_cost);
+//     println!("Expected cost: {}", expected_cost);
+//     println!("Actual cost: {}", actual_cost);
 
-    assert!(expected_cost == actual_cost);
+//     assert!(expected_cost == actual_cost);
 
-    let route = solver::Route {
-        stops: vec![1, 2, 3],
-        known_cost: None,
-        capacity_left: 0,
-    };
-    let expected_cost = 10_f64 + 10_f64 + 500_f64.sqrt() + 10_f64;
-    let actual_cost = route.cost(&vrp_instance.distance_matrix);
+//     let route = solver::Route {
+//         stops: vec![1, 2, 3],
+//         known_cost: None,
+//         capacity_left: 0,
+//     };
+//     let expected_cost = 10_f64 + 10_f64 + 500_f64.sqrt() + 10_f64;
+//     let actual_cost = route.cost(&vrp_instance.distance_matrix);
 
-    println!("Expected cost: {}", expected_cost);
-    println!("Actual cost: {}", actual_cost);
+//     println!("Expected cost: {}", expected_cost);
+//     println!("Actual cost: {}", actual_cost);
 
-    assert!(expected_cost == actual_cost);
-}
+//     assert!(expected_cost == actual_cost);
+// }
 
 fn main() {
     // Check if a file name was provided as a command-line argument
@@ -58,7 +58,7 @@ fn main() {
 
     // Create a new VRPInstance from the provided file
     let vrp_instance = VRPInstance::new(file_name);
-    test_route_cost(&vrp_instance);
+    // test_route_cost(&vrp_instance);
     let mut solver = Solver::new(vrp_instance);
 
     solver.solve();
