@@ -1,10 +1,12 @@
+use std::time::{Duration, Instant};
+
 use crate::VRPInstance;
 use crate::common::{Route, Stop};
 use rand::Rng;
 use rand::rngs::ThreadRng;
 
 #[derive(Debug, Clone)]
-struct VRPSolution<'a> {
+pub struct VRPSolution<'a> {
     routes: Vec<Route<'a>>,
 }
 
@@ -40,13 +42,21 @@ impl<'a> VRPSolution<'a> {
         self.routes.iter().map(|route| route.cost()).sum()
     }
 
-    pub fn print(self) {
-        for route in self.routes {
+    pub fn to_string(self) -> String {
+        let route_strings: Vec<String> = self.routes.iter().map(|route| {
+            let mut result = String::from("0");
+            
             for stop in route.stops() {
-                print!("{:>2} ", stop.cust_no());
+                result.push_str(&format!(" {}", stop.cust_no()));
             }
-            println!();
-        }
+            
+            result.push_str(" 0");
+            result
+        }).collect();
+        
+        let mut combined = String::from("0 ");
+        combined.push_str(&route_strings.join(" "));
+        combined
     }
 }
 
@@ -75,24 +85,23 @@ impl<'a> Solver<'a> {
 
         // let start = rand_vehicle_idx;
 
-        let rand_vehicle_idx = self.random_empty_vehicle_idx(&mut rng);
+        let rand_vehicle_idx = self.random_nonempty_vehicle_idx(&mut rng);
 
         let rand_route_idx =
             rng.random_range(0..=self.vrp_solution.routes[rand_vehicle_idx].stops().len() - 1);
 
-        println!(
-            "trying to remove customer at index {:?} from vehicle {:?} for {:?}",
-            rand_route_idx, rand_vehicle_idx, self.vrp_solution
-        );
+        // println!(
+        //     "trying to remove customer at index {:?} from vehicle {:?} for {:?}",
+        //     rand_route_idx, rand_vehicle_idx, self.vrp_solution
+        // );
+
         let removed_stop = self.vrp_solution.routes[rand_vehicle_idx].remove_stop(rand_route_idx);
 
         return removed_stop;
     }
 
-    pub fn random_empty_vehicle_idx(&self, rng: &mut ThreadRng) -> usize {
-        // let mut rng = rand::rng();
+    pub fn random_nonempty_vehicle_idx(&self, rng: &mut ThreadRng) -> usize {
         let start = rng.random_range(0..=self.vrp_instance.num_vehicles);
-
         let rand_vehicle_idx = (start..self.vrp_instance.num_vehicles)
             .chain(0..start)
             .filter_map(|i| {
@@ -110,7 +119,7 @@ impl<'a> Solver<'a> {
 
     pub fn random_repair(&mut self, stop: Stop) -> bool {
         let mut rng = rand::rng();
-        let rand_vehicle_idx = self.random_empty_vehicle_idx(&mut rng);
+        let rand_vehicle_idx = self.random_nonempty_vehicle_idx(&mut rng);
         let rand_route_idx =
             rng.random_range(0..=self.vrp_solution.routes[rand_vehicle_idx].stops().len());
 
@@ -123,6 +132,7 @@ impl<'a> Solver<'a> {
         return true;
     }
 
+    // * Simulated Annealing
     // pub fn calculate_initial_temperature(&mut self) -> f64 {
     //     let cost = self.vrp_solution.cost();
     //     let mut avg_delta_of_bad_moves = 0f64;
@@ -148,55 +158,49 @@ impl<'a> Solver<'a> {
     //         / ((0.97 - 1f64 + percentage_of_worse_moves) / percentage_of_worse_moves).ln();
     // }
 
-    pub fn solve(&mut self) {
+
+    pub fn solve(&mut self) -> VRPSolution<'a> {
         self.construct();
-        let mut incumbent_cost = self.vrp_solution.cost();
-
-        println!("solver is {:?}", self.vrp_solution);
-        // let mut temperature = self.calculate_initial_temperature();
+        
         let alpha = 0.98;
-
+        let mut incumbent_cost = self.vrp_solution.cost();
         let mut best = self.vrp_solution.clone();
-        // let mut current_solution = self.vrp_solution;
-        for _ in 0..1000000 {
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_secs(15) {
             let old_solution = self.vrp_solution.clone();
             let stop = self.random_destroy();
             if !self.random_repair(stop) {
-                // println!("")x
                 self.vrp_solution = old_solution;
                 continue;
             }
 
             let new_cost = self.vrp_solution.cost();
-
             if new_cost < best.cost() {
-                println!("new best w/ cost {:?}", new_cost);
+                println!("NEW BEST COST: {:?}", new_cost);
                 best = self.vrp_solution.clone();
-                // incumbent_cost = best.cost();
-            } else {
-                println!("NOT NEW best w/ shitty cost {:?}", new_cost);
             }
 
             let delta = new_cost - incumbent_cost;
-            if delta < 0f64 || rand::random::<f64>() < 0.02_f64 {
-                // current_solution = candidate; // accept move
-                // accept move
-                println!("accepting move to {:?}", self.vrp_solution);
+            if delta < 0f64 || rand::random::<f64>() < 0.02_f64 { // accept move
+                // println!("accepting move to {:?}", self.vrp_solution);
                 incumbent_cost = self.vrp_solution.cost();
-            } else {
-                println!("reverting back to {:?}", self.vrp_solution);
+            } else { // reject move
+                
+                // println!("reverting back to {:?}", self.vrp_solution);
                 self.vrp_solution = old_solution;
             }
             // temperature *= alpha;
         }
 
-        println!("solver is {:?}", best);
-        self.assert_sanity_solution(best);
+        println!("solution: {:?}", best);
+        self.assert_sanity_solution(&best);
+
+        return best;
     }
 
-    fn assert_sanity_solution(&mut self, sol: VRPSolution) {
+    fn assert_sanity_solution(&mut self, sol: &VRPSolution) {
         let mut total_cost = 0f64;
-        for route in sol.routes {
+        for route in sol.routes.iter() {
             route.assert_sanity();
             total_cost += route.cost();
             if route.used_capacity() > self.vrp_instance.vehicle_capacity {
