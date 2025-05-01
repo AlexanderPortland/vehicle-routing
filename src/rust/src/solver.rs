@@ -1,7 +1,7 @@
 
 use rand::Rng;
 use crate::VRPInstance;
-use crate::common::Route;
+use crate::common::{Route, Stop};
 
 struct VRPSolution<'a> {
     routes: Vec<Route<'a>>,

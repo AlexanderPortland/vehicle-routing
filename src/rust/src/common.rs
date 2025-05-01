@@ -60,10 +60,9 @@ impl<'a> Route<'a> {
         
         let cap = stop.capacity;
         let (new_cost, _) = self.speculative_add_stop(&stop, index);
+        self.stops.insert(index, stop);
         self.used_cap += cap;
         self.cost = new_cost;
-
-        self.stops.insert(index, stop);
 
         self.assert_sanity();
     }
@@ -73,7 +72,6 @@ impl<'a> Route<'a> {
         assert!(index <= self.stops.len()); // should be less than stops.len()
 
         let (new_cost, _) = self.speculative_remove_stop(index);
-
         let stop = self.stops.remove(index);
         self.used_cap -= stop.capacity;
         self.cost = new_cost;
@@ -143,7 +141,7 @@ impl<'a> Route<'a> {
         self.instance.distance_matrix.dist(start, end)
     }
 
-    // *********** SANITY CHECKING SHIT ***********
+    // *********** SANITY CHECKING ***********
 
     pub fn assert_sanity(&self) {
         self.check_route_cost();
