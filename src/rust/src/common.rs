@@ -61,12 +61,12 @@ impl<'a> Route<'a> {
 
     pub fn stops(&self) -> &Vec<Stop> { &self.stops }
 
-    pub fn route_cost(&self) -> f64 {
+    pub fn cost(&self) -> f64 {
         self.assert_sanity(); // TODO: remove for debug
         self.cost
     }
 
-    pub fn route_used_cap(&self) -> usize {
+    pub fn used_capacity(&self) -> usize {
         self.assert_sanity(); // TODO: remove for debug
         self.used_cap
     }

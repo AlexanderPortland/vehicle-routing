@@ -1,7 +1,7 @@
 use crate::VRPInstance;
 use crate::common::{Route, Stop};
-use rand::rngs::ThreadRng;
 use rand::Rng;
+use rand::rngs::ThreadRng;
 
 #[derive(Debug, Clone)]
 struct VRPSolution<'a> {
@@ -19,21 +19,25 @@ impl<'a> VRPSolution<'a> {
     }
 
     pub fn get_greedy_construction(&mut self, vrp_instance: &VRPInstance) {
-        let mut vehicle_index = 0;
-        for i in 1..vrp_instance.num_customers {
-            let demand = vrp_instance.demand_of_customer[i];
-            let customer_idx = i;
-            if (vrp_instance.vehicle_capacity - self.routes[vehicle_index].route_used_cap()) < demand {
-                vehicle_index += 1;
+        for customer_idx in 1..vrp_instance.num_customers {
+            let demand = vrp_instance.demand_of_customer[customer_idx];
+            for vehicle_idx in 0..vrp_instance.num_vehicles {
+                if (vrp_instance.vehicle_capacity - self.routes[vehicle_idx].used_capacity())
+                    >= demand
+                {
+                    let len = self.routes[vehicle_idx].stops().len();
+                    self.routes[vehicle_idx].add_stop_to_index(
+                        Stop::new(customer_idx.try_into().unwrap(), demand),
+                        len,
+                    );
+                    break;
+                }
             }
-            assert!(vehicle_index < self.routes.len());
-            let len = self.routes[vehicle_index].stops().len();
-            self.routes[vehicle_index].add_stop_to_index(Stop::new(customer_idx.try_into().unwrap(), demand), len);
         }
     }
 
     pub fn cost(&self) -> f64 {
-        self.routes.iter().map(|route| route.route_cost()).sum()
+        self.routes.iter().map(|route| route.cost()).sum()
     }
 
     pub fn print(self) {
@@ -76,9 +80,11 @@ impl<'a> Solver<'a> {
         let rand_route_idx =
             rng.random_range(0..=self.vrp_solution.routes[rand_vehicle_idx].stops().len() - 1);
 
-        println!("trying to remove customer at index {:?} from vehicle {:?} for {:?}", rand_route_idx, rand_vehicle_idx, self.vrp_solution);
-        let removed_stop =
-            self.vrp_solution.routes[rand_vehicle_idx].remove_stop(rand_route_idx);
+        println!(
+            "trying to remove customer at index {:?} from vehicle {:?} for {:?}",
+            rand_route_idx, rand_vehicle_idx, self.vrp_solution
+        );
+        let removed_stop = self.vrp_solution.routes[rand_vehicle_idx].remove_stop(rand_route_idx);
 
         return removed_stop;
     }
@@ -87,11 +93,17 @@ impl<'a> Solver<'a> {
         // let mut rng = rand::rng();
         let start = rng.random_range(0..=self.vrp_instance.num_vehicles);
 
-        let rand_vehicle_idx = (start..self.vrp_instance.num_vehicles).chain(0..start).filter_map(|i|
-            if self.vrp_solution.routes[i].stops().len() > 0 {
-                Some(i)
-            } else { None }
-        ).next().unwrap();
+        let rand_vehicle_idx = (start..self.vrp_instance.num_vehicles)
+            .chain(0..start)
+            .filter_map(|i| {
+                if self.vrp_solution.routes[i].stops().len() > 0 {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .next()
+            .unwrap();
         // println!("got random idx {:?}", rand_vehicle_idx);
         return rand_vehicle_idx;
     }
@@ -146,7 +158,7 @@ impl<'a> Solver<'a> {
 
         let mut best = self.vrp_solution.clone();
         // let mut current_solution = self.vrp_solution;
-        for _ in 0..1000 {
+        for _ in 0..1000000 {
             let old_solution = self.vrp_solution.clone();
             let stop = self.random_destroy();
             if !self.random_repair(stop) {
@@ -179,5 +191,18 @@ impl<'a> Solver<'a> {
         }
 
         println!("solver is {:?}", best);
+        self.assert_sanity_solution(best);
+    }
+
+    fn assert_sanity_solution(&mut self, sol: VRPSolution) {
+        let mut total_cost = 0f64;
+        for route in sol.routes {
+            route.assert_sanity();
+            total_cost += route.cost();
+            if route.used_capacity() > self.vrp_instance.vehicle_capacity {
+                panic!("Route ({}) failed", route.to_string());
+            }
+        }
+
     }
 }
