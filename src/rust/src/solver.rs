@@ -1,62 +1,7 @@
 
 use rand::Rng;
-
 use crate::VRPInstance;
-
-pub struct Stop {
-    pub customer_idx: usize,
-    pub demand: usize,
-}
-
-pub struct Route {
-    pub stops: Vec<u16>,
-    pub known_cost: Option<f64>,
-    pub capacity_left: usize,
-}
-
-impl Route {
-    pub fn cost(&self, distance_matrix: &Vec<Vec<f64>>) -> f64 {
-        let mut cost = 0f64;
-
-        for i in 1..self.stops.len() {
-            cost += distance_matrix[self.stops[i - 1] as usize][self.stops[i] as usize];
-        }
-
-        if self.stops.len() > 0 {
-            cost += distance_matrix[0][self.stops[0] as usize];
-            cost += distance_matrix[self.stops[self.stops.len() - 1] as usize][0];
-        }
-
-        cost
-    }
-
-    pub fn contains_stop(&self, stop: u16) -> bool {
-        self.stops.iter().any(|a| *a == stop)
-    }
-
-    pub fn assert_sanity(&self) {
-        let mut existing = HashSet::new();
-
-        for el in &self.stops {
-            assert!(!existing.contains(el));
-            existing.insert(el);
-        }
-
-        assert!(existing.len() == self.stops.len());
-    }
-
-    pub fn add_stop_to_end(&mut self, stop: Stop) {
-        todo!()
-    }
-
-    pub fn add_stop_at_index(&mut self, stop: Stop, index: usize) {
-        todo!()
-    }
-
-    pub fn remove_stop_at_index(&mut self, index: usize) -> Stop {
-        todo!()
-    }
-}
+use crate::common::Route;
 
 struct VRPSolution {
     routes: Vec<Route>,
@@ -115,8 +60,6 @@ impl VRPSolution {
             println!();
         }
     }
-
-    pub fn is_feasible_w_cap(&self, cap: usize)
 }
 
 pub struct Solver {

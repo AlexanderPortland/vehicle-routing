@@ -45,7 +45,7 @@ impl<'a> Route<'a> {
     pub fn route_used_cap(&self) -> usize {
         self.assert_sanity(); // TODO: remove for debug
         self.used_cap
-    }c
+    }
 
     pub fn contains_stop(&self, cust_no: u16) -> bool {
         self.stops.iter().any(|a|{ a.cust_no == cust_no })
