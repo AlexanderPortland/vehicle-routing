@@ -21,6 +21,9 @@ impl Stop {
     pub fn new(cust_no: u16, capacity: usize) -> Self {
         Stop { cust_no, capacity }
     }
+
+    pub fn cust_no(&self) -> u16 { self.cust_no }
+    pub fn capacity(&self) -> usize { self.capacity }
 }
 
 pub struct Route<'a> {
