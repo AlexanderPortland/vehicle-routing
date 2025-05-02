@@ -42,7 +42,7 @@ impl<'a> VRPSolution<'a> {
         self.routes.iter().map(|route| route.cost()).sum()
     }
 
-    pub fn to_string(self) -> String {
+    pub fn to_stdout_string(&self) -> String {
         let route_strings: Vec<String> = self.routes.iter().map(|route| {
             let mut result = String::from("0");
             
@@ -57,6 +57,22 @@ impl<'a> VRPSolution<'a> {
         let mut combined = String::from("0 ");
         combined.push_str(&route_strings.join(" "));
         combined
+    }
+
+    pub fn to_file_string(&self) -> String {
+        let mut res = String::from(format!("{} 0\n", self.cost()));
+        let route_strings: Vec<String> = self.routes.iter().map(|route| {
+            let mut result = String::from("0");
+            
+            for stop in route.stops() {
+                result.push_str(&format!(" {}", stop.cust_no()));
+            }
+            
+            result.push_str(" 0\n");
+            result
+        }).collect();
+        res.push_str(&route_strings.join(""));
+        res
     }
 }
 
@@ -207,6 +223,18 @@ impl<'a> Solver<'a> {
                 panic!("Route ({}) failed", route.to_string());
             }
         }
-
+        
+        for i in 1..self.vrp_instance.num_customers {
+            let mut found = false;
+            for route in sol.routes.iter() {
+                if route.stops().contains(i) {
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                panic!("Customer {} not visited", i);
+            }
+        }
     }
 }
