@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::VRPInstance;
 use crate::common::{Route, Stop};
@@ -7,7 +7,7 @@ use rand::{rng, Rng};
 use rand::rngs::ThreadRng;
 
 #[derive(Debug, Clone)]
-struct VRPSolution<'a> {
+pub struct VRPSolution<'a> {
     routes: Vec<Route<'a>>,
 }
 
@@ -43,13 +43,21 @@ impl<'a> VRPSolution<'a> {
         self.routes.iter().map(|route| route.cost()).sum()
     }
 
-    pub fn print(self) {
-        for route in self.routes {
+    pub fn to_string(self) -> String {
+        let route_strings: Vec<String> = self.routes.iter().map(|route| {
+            let mut result = String::from("0");
+            
             for stop in route.stops() {
-                print!("{:>2} ", stop.cust_no());
+                result.push_str(&format!(" {}", stop.cust_no()));
             }
-            println!();
-        }
+            
+            result.push_str(" 0");
+            result
+        }).collect();
+        
+        let mut combined = String::from("0 ");
+        combined.push_str(&route_strings.join(" "));
+        combined
     }
 }
 
@@ -78,24 +86,23 @@ impl<'a> Solver<'a> {
 
         // let start = rand_vehicle_idx;
 
-        let rand_vehicle_idx = self.random_empty_vehicle_idx(&mut rng);
+        let rand_vehicle_idx = self.random_nonempty_vehicle_idx(&mut rng);
 
         let rand_route_idx =
             rng.random_range(0..=self.vrp_solution.routes[rand_vehicle_idx].stops().len() - 1);
 
-        println!(
-            "trying to remove customer at index {:?} from vehicle {:?} for {:?}",
-            rand_route_idx, rand_vehicle_idx, self.vrp_solution
-        );
+        // println!(
+        //     "trying to remove customer at index {:?} from vehicle {:?} for {:?}",
+        //     rand_route_idx, rand_vehicle_idx, self.vrp_solution
+        // );
+
         let removed_stop = self.vrp_solution.routes[rand_vehicle_idx].remove_stop(rand_route_idx);
 
         return removed_stop;
     }
 
-    pub fn random_empty_vehicle_idx(&self, rng: &mut ThreadRng) -> usize {
-        // let mut rng = rand::rng();
+    pub fn random_nonempty_vehicle_idx(&self, rng: &mut ThreadRng) -> usize {
         let start = rng.random_range(0..=self.vrp_instance.num_vehicles);
-
         let rand_vehicle_idx = (start..self.vrp_instance.num_vehicles)
             .chain(0..start)
             .filter_map(|i| {
@@ -113,7 +120,7 @@ impl<'a> Solver<'a> {
 
     pub fn random_repair(&mut self, stop: Stop) -> bool {
         let mut rng = rand::rng();
-        let rand_vehicle_idx = self.random_empty_vehicle_idx(&mut rng);
+        let rand_vehicle_idx = self.random_nonempty_vehicle_idx(&mut rng);
         let rand_route_idx =
             rng.random_range(0..=self.vrp_solution.routes[rand_vehicle_idx].stops().len());
 
@@ -174,6 +181,7 @@ impl<'a> Solver<'a> {
 
     fn assert_sanity_solution(&mut self, sol: &VRPSolution) {
         let mut total_cost = 0f64;
+
         for route in &sol.routes {
             route.assert_sanity();
             total_cost += route.cost();
@@ -181,7 +189,6 @@ impl<'a> Solver<'a> {
                 panic!("Route ({}) failed", route.to_string());
             }
         }
-
     }
 
     fn remove_worst_stop(&mut self, tabu: &Vec<Stop>) -> (Stop, usize) {

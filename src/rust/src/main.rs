@@ -2,9 +2,19 @@ mod solver;
 mod common;
 mod vrp_instance;
 
-use std::env;
+use std::{env, time::Instant};
 use vrp_instance::VRPInstance;
-use solver::{Solver};
+use solver::Solver;
+
+use serde_json::{json, to_string_pretty};
+use std::path::Path;
+
+fn get_filename_from_path(path: &str) -> &str {
+    Path::new(path)
+        .file_name()
+        .and_then(|filename| filename.to_str())
+        .unwrap_or("")
+}
 
 // fn test_route_cost(vrp_instance: &VRPInstance) {
 //     let route = Route {
@@ -56,10 +66,19 @@ fn main() {
 
     let file_name = &args[1];
 
-    // Create a new VRPInstance from the provided file
+    let start = Instant::now();
     let vrp_instance = VRPInstance::new(file_name);
-    // test_route_cost(&vrp_instance);
     let mut solver = Solver::new(&vrp_instance);
+    let sol = solver.solve();
+    let duration = start.elapsed();
 
-    solver.solve();
+    
+    let output = json!({
+        "Instance": get_filename_from_path(file_name),
+        "Time": (duration.as_secs_f64() * 100.0).round() / 100.0,
+        "Result": sol.cost(),
+        "Solution": sol.to_string(),
+    });
+    
+    println!("{}", serde_json::to_string(&output).unwrap());
 }

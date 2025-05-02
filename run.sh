@@ -12,4 +12,5 @@ fi
 	
 input=$1
 
-java -cp src solver.ls.Main $input
+cd src/rust
+cargo run --release $input
