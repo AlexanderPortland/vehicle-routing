@@ -129,6 +129,18 @@ impl<'a> Route<'a> {
         return (new_cost, self.used_cap - self.stops[index].capacity + stop.capacity <= self.instance.vehicle_capacity);
     }
 
+    pub fn speculative_add_best(&self, stop: &Stop) -> ((f64, bool), usize) {
+        self.assert_sanity();
+
+        let best_index = (0..self.stops.len()).into_iter().max_by_key(|i|{
+            -1 * (self.speculative_add_stop(stop, *i).0 as isize)
+        }).unwrap();
+
+        let best_val = self.speculative_add_stop(stop, best_index);
+
+        (best_val, best_index)
+    }
+
     // the change in cost for how much adding 
     pub fn speculative_add_stop(&self, stop: &Stop, index: usize) -> (f64, bool) {
         self.assert_sanity();

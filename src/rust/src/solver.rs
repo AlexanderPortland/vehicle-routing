@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::time::Instant;
 
 use crate::VRPInstance;
 use crate::common::{Route, Stop};
@@ -126,7 +127,7 @@ impl<'a> Solver<'a> {
     }
 
     pub fn solve(&mut self) {
-        println!("\n\n ------- INIT ------");
+        println!("\n\n------- INIT ------");
         self.construct();
         let mut incumbent_cost = self.vrp_solution.cost();
 
@@ -136,8 +137,10 @@ impl<'a> Solver<'a> {
         let mut best = self.vrp_solution.clone();
         // let mut current_solution = self.vrp_solution;
         let mut tabu = Vec::new();
-        for i in 0..90000 {
-            println!("\n\n ------ ITER {} ------", i);
+        let mut small_float_diff = 0;
+        let start = Instant::now();
+        for i in 0..4000 {
+            // println!("\n\n------ ITER {} ------", i);
             // look at best thing to remove, and best place to put it
             let (rem, rem_r) = self.remove_worst_stop(&tabu);
             tabu.push(rem.clone());
@@ -146,16 +149,27 @@ impl<'a> Solver<'a> {
             // self.reinsert_replace_stop(rem, rem_r);
 
             if self.vrp_solution.cost() < best.cost() {
-                println!("FOUND NEW BEST IM THE GOAT {:?}", self.vrp_solution.cost());
+                if (self.vrp_solution.cost() - best.cost()).abs() < 0.01 {
+                    small_float_diff += 1;
+                    println!("FOUND NEW (small) BEST on iter {i} IM THE GOAT {:?}", self.vrp_solution.cost());
+                    if small_float_diff >= 15 {
+                        println!("just small fry...");
+                        break;
+                    }
+                } else {
+                    small_float_diff = 0;
+                    println!("FOUND NEW BEST on iter {i} IM THE GOAT {:?}", self.vrp_solution.cost());
+                }
+                // println!("FOUND NEW BEST on iter {i} IM THE GOAT {:?}", self.vrp_solution.cost());
                 best = self.vrp_solution.clone();
             } else {
-                println!("didn't find a new best im not really that good ... :( {:?}", self.vrp_solution.cost());
+                // println!("didn't find a new best im not really that good ... :( {:?}", self.vrp_solution.cost());
             }
-            println!("finish iter {i}");
+            // println!("finish iter {i}");
         }
 
         self.assert_sanity_solution(&best);
-        println!("solver is {:?} w/ cost {:?}", best, best.cost());
+        println!("solver is {:?} w/ cost {:?} \nin {:?}", best, best.cost(), start.elapsed());
     }
 
     fn assert_sanity_solution(&mut self, sol: &VRPSolution) {
@@ -171,7 +185,7 @@ impl<'a> Solver<'a> {
     }
 
     fn remove_worst_stop(&mut self, tabu: &Vec<Stop>) -> (Stop, usize) {
-        println!("removing worst stop from {:?} w/ tabu {:?}", self.vrp_solution, tabu);
+        // println!("removing worst stop from {:?} w/ tabu {:?}", self.vrp_solution, tabu);
 
         let (mut worst_spot_r, mut worst_spot_i, mut worst_spot_cost) = (100000, 100000, f64::MIN);
 
@@ -182,7 +196,7 @@ impl<'a> Solver<'a> {
                 let (new_cost, feas) = route.speculative_remove_stop(i);
                 // we want the new cost to be much less than previous, so maximize cost
                 let cost = route.cost() - new_cost;
-                println!("removing i{:?} from {:?} has cost {:?} & feas {:?} (cur existing {:?})", i, route, cost, feas, worst_spot_cost);
+                // println!("removing i{:?} from {:?} has cost {:?} & feas {:?} (cur existing {:?})", i, route, cost, feas, worst_spot_cost);
                 if feas {
                     feas_vals.push((r, i));
                     if cost > worst_spot_cost {
@@ -197,24 +211,58 @@ impl<'a> Solver<'a> {
         // if rng().random_bool(0.05_f64) {
         if true {
             // go for a fucking walk
-            println!("go for a fucking walk...");
+            // println!("go for a fucking walk...");
 
             (worst_spot_r, worst_spot_i) = *feas_vals.get(rng().random_range(0..feas_vals.len())).unwrap();
         }
 
-        println!("best was to remove {:?} from {:?} @ {:?}", self.vrp_solution.routes[worst_spot_r].stops()[worst_spot_i], self.vrp_solution.routes[worst_spot_r], worst_spot_i);
+        // println!("best was to remove {:?} from {:?} @ {:?}", self.vrp_solution.routes[worst_spot_r].stops()[worst_spot_i], self.vrp_solution.routes[worst_spot_r], worst_spot_i);
 
         let res = self.vrp_solution.routes[worst_spot_r].remove_stop(worst_spot_i);
         return (res, worst_spot_r);
     }
 
-    fn reinsert_replace_stop(&mut self, stop: Stop, old_r: usize) {
+    fn reinsert_replace_stop(&mut self, stop: Stop, old_r_i: usize) {
         let (mut best_spot_r, mut best_spot_i, mut best_spot_cost) = (100000, 100000, f64::MAX);
+        let old_r_cap = self.vrp_solution.routes[old_r_i].used_capacity();
+        let old_r = &self.vrp_solution.routes[old_r_i];
 
         for (r, route) in self.vrp_solution.routes.iter().enumerate() {
+            let route_cap = route.used_capacity();
+            if (r == old_r_i) { continue; }
+
             for i in 0..(route.stops().len()) {
-                let (new_cost, feas) = route.speculative_replace_stop(&stop, i);
-                let cost = route.cost() - new_cost;
+                let stop_ref = &route.stops()[i];
+                let old_new_cap = (old_r_cap + stop_ref.capacity());
+                let new_new_cap = (route_cap + stop.capacity() - stop_ref.capacity());
+                println!("old cap {:?} new cap {:?}, new_cap no removed {:?}", old_r_cap, route_cap, route_cap - stop_ref.capacity());
+                // let can_new_go_to_old = (old_r_cap - stop_ref.capacity()) >= 0;
+                // let can_old_go_to_new = (route_cap + stop_ref.capacity() - stop.capacity()) >= 0;
+                println!("trying to swap {:?} into {:?} and {:?} into {:?} to get {:?} and {:?} (of {:?})", stop_ref, old_r, stop, route, old_new_cap, new_new_cap, self.vrp_instance.vehicle_capacity);
+                println!("that is ({:?}, {:?})", old_new_cap, new_new_cap);
+
+                if !(old_new_cap < self.vrp_instance.vehicle_capacity 
+                    && new_new_cap < self.vrp_instance.vehicle_capacity) {
+                    continue;
+                }
+
+                println!("HORAYYYY");
+
+                // speculatively replace
+                let ((new_cost_1, feas), i) = route.speculative_add_best(&stop);
+                let ((new_cost_2, feas), i) = old_r.speculative_add_best(&stop_ref);
+
+                println!("people used to be ({:?}, {:?})", old_r.cost(), route.cost());
+                println!("people now are to be ({:?}, {:?})", new_cost_2, new_cost_1);
+                let cost_diff = (route.cost() - new_cost_1) + (old_r.cost() - new_cost_2);
+                println!("net diff is {:?}", cost_diff);
+
+                // try to add back to the old one
+
+                // we want the new cost to be much less than the old cost, so we maximize this difference
+                let cost = (route.cost()) - new_cost_1;
+
+                
                 // println!("absolute cost {:?}, relative {:?} (existing {:?})", new_cost, cost);
                 println!("res for replacing {:?} w/ {:?} in {:?} (@{:?}) is {:?}", route.stops()[i], stop, route, i, (cost, feas));
                 // if feas { valid.push((r, i)); }
@@ -241,8 +289,8 @@ impl<'a> Solver<'a> {
 
                 // we want the one that will increase the new cost by the least, so minimize
                 let cost_increase = new_cost - route.cost();
-                println!("res for adding {:?} to {:?} (@{:?}) is {:?}", stop, route, i, (cost_increase, feas));
-                println!("existing is {:?}", best_spot_cost_increase);
+                // println!("res for adding {:?} to {:?} (@{:?}) is {:?}", stop, route, i, (cost_increase, feas));
+                // println!("existing is {:?}", best_spot_cost_increase);
                 if feas { valid.push((r, i)); }
                 if feas && cost_increase < best_spot_cost_increase {
                     (best_spot_r, best_spot_i) = (r, i);
@@ -253,11 +301,11 @@ impl<'a> Solver<'a> {
 
         if rng().random_bool(0.05_f64) {
             let i = rng().random_range(0..valid.len());
-            println!("RANDOM DROP at i {i}...");
+            // println!("RANDOM DROP at i {i}...");
             (best_spot_r, best_spot_i) = *valid.get(i).unwrap();
         }
 
-        println!("best was to add {:?} to {:?} @ {:?}", stop, self.vrp_solution.routes[best_spot_r], best_spot_i);
+        // println!("best was to add {:?} to {:?} @ {:?}", stop, self.vrp_solution.routes[best_spot_r], best_spot_i);
         self.vrp_solution.routes[best_spot_r].add_stop_to_index(stop, best_spot_i);
     }
 }
