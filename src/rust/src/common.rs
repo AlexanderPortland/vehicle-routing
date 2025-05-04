@@ -12,7 +12,7 @@ impl DistanceMatrix {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash)]
 pub struct Stop {
     cust_no: u16,
     capacity: usize
@@ -23,6 +23,8 @@ impl PartialEq for Stop {
         self.cust_no == other.cust_no
     }
 }
+
+impl Eq for Stop { }
 
 impl std::fmt::Debug for Stop {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -56,7 +58,21 @@ impl VRPSolution {
     }
 
     pub fn is_valid_solution(&self, vrp_instance: &Arc<VRPInstance>) -> bool {
-        todo!()
+        // all routes should be under capacity
+        self.routes.iter().for_each(|r| if r.used_capacity() > vrp_instance.vehicle_capacity {
+            panic!("route {:?} is over cap {:?}", r, vrp_instance.vehicle_capacity);
+        });
+
+        // all customers should be visited
+        for c in 1..vrp_instance.num_customers {
+            let is_visited = self.routes.iter().any(|r| r.contains_stop(c.try_into().unwrap()));
+            if !is_visited {
+                panic!("customer {} isn't visited in solution {:?}", c, self);
+                return false;
+            }
+        }
+        
+        return true;
     }
 
     pub fn cost(&self) -> f64 {
@@ -101,7 +117,7 @@ impl VRPSolution {
 
 #[derive(Clone)]
 pub struct Route {
-    instance: std::sync::Arc<VRPInstance>,
+    pub instance: std::sync::Arc<VRPInstance>,
     id: usize,
     stops: Vec<Stop>,
     cost: f64,
