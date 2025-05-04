@@ -26,6 +26,22 @@ impl VRPSolution {
         todo!()
     }
 
+    pub fn to_file_string(&self) -> String {
+        let mut res = String::from(format!("{} 0\n", self.cost()));
+        let route_strings: Vec<String> = self.routes.iter().map(|route| {
+            let mut result = String::from("0");
+            
+            for stop in route.stops() {
+                result.push_str(&format!(" {}", stop.cust_no()));
+            }
+            
+            result.push_str(" 0\n");
+            result
+        }).collect();
+        res.push_str(&route_strings.join(""));
+        res
+    }
+
     // pub fn get_greedy_construction(&mut self, vrp_instance: &VRPInstance) {
     //     for customer_idx in 1..vrp_instance.num_customers {
     //         let demand = vrp_instance.demand_of_customer[customer_idx];
@@ -53,7 +69,7 @@ impl VRPSolution {
         self.routes.iter().map(|route| route.cost()).sum()
     }
 
-    pub fn to_string(self) -> String {
+    pub fn to_string(&self) -> String {
         let route_strings: Vec<String> = self.routes.iter().map(|route| {
             let mut result = String::from("0");
             

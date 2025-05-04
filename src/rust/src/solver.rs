@@ -123,22 +123,6 @@ impl<T> IterativeSolver for T
     fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>) {
         self.update_search_location(new_best);
     }
-
-    pub fn to_file_string(&self) -> String {
-        let mut res = String::from(format!("{} 0\n", self.cost()));
-        let route_strings: Vec<String> = self.routes.iter().map(|route| {
-            let mut result = String::from("0");
-            
-            for stop in route.stops() {
-                result.push_str(&format!(" {}", stop.cust_no()));
-            }
-            
-            result.push_str(" 0\n");
-            result
-        }).collect();
-        res.push_str(&route_strings.join(""));
-        res
-    }
 }
 
 pub struct TodoSolver;
