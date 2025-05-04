@@ -207,9 +207,14 @@ impl Route {
     pub fn speculative_add_best(&self, stop: &Stop) -> ((f64, bool), usize) {
         self.assert_sanity();
 
-        let best_index = (0..self.stops.len()).into_iter().max_by_key(|i|{
-            -1 * (self.speculative_add_stop(stop, *i).0 as isize)
-        }).unwrap();
+        // println!("stops are {:?}", self.stops);
+        let best_index = if self.stops.is_empty() { 
+            0 
+        } else {
+            (0..self.stops.len()).into_iter().max_by_key(|i|{
+                -1 * (self.speculative_add_stop(stop, *i).0 as isize)
+            }).unwrap()
+        };
 
         let best_val = self.speculative_add_stop(stop, best_index);
 
