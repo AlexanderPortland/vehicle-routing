@@ -34,10 +34,11 @@ fn main() {
 
     let start = Instant::now();
     let vrp_instance = VRPInstance::new(file_name);
-
-    let sol = solver::solve::<solvers::MoveLNSSolver>(
+    // let mut solver = Solver::new(vrp_instance);
+    // let sol = solver.solve();
+    let sol = solver::solve::<solvers::SimpleLNSSolver>(
         Arc::new(vrp_instance), 
-        SolveParams{
+        SolveParams {
             max_iters: 1000,
             constructor: construct::greedy,
         }

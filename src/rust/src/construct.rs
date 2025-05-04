@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use rand::seq::SliceRandom;
+use rand::SeedableRng;
 
 use crate::{common::Stop, common::VRPSolution, vrp_instance::VRPInstance};
 use std::cmp::Reverse;
@@ -42,7 +43,7 @@ pub fn cheapest_insertion(vrp_instance: &Arc<VRPInstance>) -> VRPSolution {
     // randomly shuffled
     let seed = 42u64;
     let mut rng = StdRng::seed_from_u64(seed);
-    customer_nos.shuffle(rng);
+    customer_nos.shuffle(&mut rng);
 
     let mut sol = VRPSolution::new(vrp_instance.clone());
 

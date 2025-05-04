@@ -17,7 +17,7 @@ pub trait LNSSolver {
     fn repair(&mut self, res: Self::DestroyResult) -> VRPSolution;
 
     /// Update the solution to search from next.
-    fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>);
+    // fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>);
 
     // Optionally update the tabu for the solver.
     fn update_tabu(&mut self, res: &Self::DestroyResult) {}
@@ -69,13 +69,16 @@ mod stats {
 
 #[cfg(not(debug_assertions))]
 mod stats {
+    use crate::old_solver::VRPSolution;
+
     pub struct SolveStats();
+
     impl SolveStats {
         pub fn new() -> Self {
             SolveStats()
         }
 
-        pub fn update_stats(&mut self, iter: usize, new_sol: &VRPSolution, new_best: bool);
+        pub fn update_stats(&mut self, iter: usize, new_sol: &VRPSolution, improvement: f64) {}
     }
 }
 
