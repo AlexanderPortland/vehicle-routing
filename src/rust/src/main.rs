@@ -39,6 +39,7 @@ fn main() {
         Arc::new(vrp_instance), 
         SolveParams {
             max_iters: 10000,
+            patience: 100,
             constructor: construct::greedy,
         }
     );

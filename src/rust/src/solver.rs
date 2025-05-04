@@ -18,6 +18,7 @@ pub trait LNSSolver {
 
     // / Update the solution to search from next.
     // fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>);
+    fn jump_to_solution(&mut self, sol: VRPSolution);
 
     // Optionally update the tabu for the solver.
     fn update_tabu(&mut self, res: &Self::DestroyResult) {}
@@ -25,6 +26,8 @@ pub trait LNSSolver {
 
 pub struct SolveParams {
     pub max_iters: usize,
+    /// jump after this many stagnant iterations
+    pub patience: usize,
     pub constructor: fn(&Arc<VRPInstance>) -> VRPSolution,
 }
 
@@ -33,8 +36,7 @@ pub trait IterativeSolver {
 
     fn find_new_solution(&mut self) -> VRPSolution;
 
-    //  Update the solution to search from next.
-    // fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>);
+    fn jump_to_solution(&mut self, sol: VRPSolution);
 }
 
 #[cfg(debug_assertions)]
@@ -44,6 +46,7 @@ mod stats {
     #[derive(Debug)]
     pub struct SolveStats {
         improvements: Vec<(usize, f64)>,
+        restarts: Vec<usize>,
         small_improvements: usize,
     }
     
@@ -51,8 +54,13 @@ mod stats {
         pub fn new() -> Self {
             SolveStats { 
                 improvements: Vec::new(),
+                restarts: Vec::new(),
                 small_improvements: 0,
             }
+        }
+
+        pub fn restart_count(&self) -> usize {
+            self.restarts.len()
         }
 
         pub fn update_stats(&mut self, iter: usize, new_sol: &VRPSolution, improvement_on_best: f64) {
@@ -65,6 +73,10 @@ mod stats {
                     // println!("SMALL IMPROVEMENT");
                 }
             }
+        }
+
+        pub fn on_restart(&mut self, iter: usize) {
+            self.restarts.push(iter);
         }
     }
 }
@@ -82,6 +94,8 @@ mod stats {
         }
 
         pub fn update_stats(&mut self, iter: usize, new_sol: &VRPSolution, improvement: f64) {}
+
+        pub fn on_restart(&mut self, iter: usize) {}
     }
 }
 
@@ -96,7 +110,8 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
 
     let mut best = initial_solution; // TODO: stop cloning these
     let mut best_cost = best.cost();
-    let mut last_cost = best_cost;
+    let mut stagnant_iterations = 0;
+    let mut last_cost = best.cost();
 
     for iter in 0..params.max_iters {
         let new_solution = solver.find_new_solution();
@@ -111,15 +126,35 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
         if new_cost < best_cost {
             println!("NEW BEST iter {:?} has cost {:?}", iter, new_cost);
             (best_cost, best) = (new_solution.cost(), new_solution);
-            // solver.update_search_location(Some((&best, best_cost)));
         } else {
             if iter % 20 == 0 {println!("iter {:?} has cost {:?}", iter, new_cost);}
-            // solver.update_search_location(None);
         }
+
+        if last_cost < new_cost || (new_cost - last_cost).abs() < 0.01 {
+            // no improvement
+            println!("stagnating at iter {:?} (new cost {:?}, last {:?})", iter, new_cost, last_cost);
+            stagnant_iterations += 1;
+        } else {
+            println!("NOT stagnating at iter {:?} (new cost {:?}, last {:?})", iter, new_cost, last_cost);
+            stagnant_iterations = 0;
+        }
+
         last_cost = new_cost;
+
+        if stagnant_iterations > params.patience {
+            println!("best is {:?}", best_cost);
+            println!("restarting bc of {} iters of stagnation", params.patience);
+            // todo!();
+            stagnant_iterations = 0;
+            solver.jump_to_solution((params.constructor)(&instance));
+            solve_stats.on_restart(iter);
+        }
+
+        
     }
 
     println!("solve stats {:?}", solve_stats);
+    // println!("{:?} restarts", solve_stats.restart_count());
 
     best
 }
@@ -134,6 +169,10 @@ impl<T> IterativeSolver for T
         let destroy_res = self.destroy();
         self.update_tabu(&destroy_res);
         self.repair(destroy_res)
+    }
+    
+    fn jump_to_solution(&mut self, sol: VRPSolution) {
+        self.jump_to_solution(sol);
     }
 
     // fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>) {

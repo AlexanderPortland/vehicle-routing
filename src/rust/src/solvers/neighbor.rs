@@ -33,6 +33,11 @@ impl LNSSolver for SimpleLNSSolver {
         self.current.clone()
     }
 
+    fn jump_to_solution(&mut self, sol: VRPSolution) {
+        self.current = sol;
+        self.tabu.clear();
+    }
+
     fn update_tabu(&mut self, res: &Self::DestroyResult) {
         self.tabu.push_back(res.0);
         if self.tabu.len() > MAX_TABU { self.tabu.pop_front(); }
@@ -86,7 +91,7 @@ impl SimpleLNSSolver {
 
                 // we want the one that will increase the new cost by the least, so minimize
                 let cost_increase = new_cost - route.cost();
-                println!("res for adding {:?} to {:?} (@{:?}) is {:?}", stop, route, i, (cost_increase, feas));
+                // println!("res for adding {:?} to {:?} (@{:?}) is {:?}", stop, route, i, (cost_increase, feas));
                 // println!("existing is {:?}", best_spot_cost_increase);
                 if feas { valid.push((r, i)); }
                 if feas && cost_increase < best_spot_cost_increase {
@@ -102,7 +107,7 @@ impl SimpleLNSSolver {
             (best_spot_r, best_spot_i) = *valid.get(i).unwrap();
         }
 
-        println!("best was to add {:?} to {:?} @ {:?}", stop, sol.routes[best_spot_r], best_spot_i);
+        // println!("best was to add {:?} to {:?} @ {:?}", stop, sol.routes[best_spot_r], best_spot_i);
         sol.routes[best_spot_r].add_stop_to_index(stop, best_spot_i);
     }
 }
