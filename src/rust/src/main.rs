@@ -3,6 +3,7 @@ mod common;
 mod vrp_instance;
 mod solver;
 mod construct;
+pub mod solvers;
 
 use std::{env, sync::Arc, time::Instant};
 use solver::SolveParams;
@@ -73,7 +74,13 @@ fn main() {
     let vrp_instance = VRPInstance::new(file_name);
     // let mut solver = Solver::new(vrp_instance);
     // let sol = solver.solve();
-    let sol = solver::solve::<solver::TodoSolver>(Arc::new(vrp_instance), SolveParams{max_iters: 1000});
+    let sol = solver::solve::<solvers::MoveLNSSolver>(
+        Arc::new(vrp_instance), 
+        SolveParams{
+            max_iters: 1000,
+            constructor: construct::greedy,
+        }
+    );
     let duration = start.elapsed();
 
     
