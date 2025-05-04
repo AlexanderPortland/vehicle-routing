@@ -33,11 +33,12 @@ fn main() {
     let file_name = get_filename_from_path(file_path);
 
     let start = Instant::now();
-    let vrp_instance = VRPInstance::new(file_path);
-
-    let sol = solver::solve::<solvers::MoveLNSSolver>(
+    let vrp_instance = VRPInstance::new(file_name);
+    // let mut solver = Solver::new(vrp_instance);
+    // let sol = solver.solve();
+    let sol = solver::solve::<solvers::SimpleLNSSolver>(
         Arc::new(vrp_instance), 
-        SolveParams{
+        SolveParams {
             max_iters: 1000,
             constructor: construct::greedy,
         }

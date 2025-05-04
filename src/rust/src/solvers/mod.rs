@@ -1,3 +1,3 @@
 mod neighbor;
 
-pub use neighbor::MoveLNSSolver;
+pub use neighbor::SimpleLNSSolver;

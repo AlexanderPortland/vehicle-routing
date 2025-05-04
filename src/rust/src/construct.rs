@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use rand::seq::SliceRandom;
+use rand::SeedableRng;
 
 use crate::{common::Stop, common::VRPSolution, vrp_instance::VRPInstance};
 use std::cmp::Reverse;
