@@ -1,10 +1,12 @@
-mod solver;
+mod old_solver;
 mod common;
 mod vrp_instance;
+mod solver;
+mod construct;
 
 use std::{env, time::Instant};
 use vrp_instance::VRPInstance;
-use solver::Solver;
+use old_solver::Solver;
 
 use serde_json::{json, to_string_pretty};
 use std::path::Path;
