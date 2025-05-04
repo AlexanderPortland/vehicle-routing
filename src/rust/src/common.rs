@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use crate::vrp_instance::VRPInstance;
 
@@ -40,29 +40,28 @@ impl Stop {
 }
 
 #[derive(Clone)]
-pub struct Route<'a> {
-    instance: &'a VRPInstance,
+pub struct Route {
+    instance: std::sync::Arc<VRPInstance>,
     id: usize,
     stops: Vec<Stop>,
     cost: f64,
     used_cap: usize
 }
 
-impl<'a> std::fmt::Debug for Route<'a> {
+impl std::fmt::Debug for Route {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("{}", self.to_string()))
     }
 }
 
-impl<'a> Route<'a> {
+impl Route {
     pub fn to_string(&self) -> String {
-        let mut s = "[".to_string();
         let middle = self.stops.iter().map(|i| format!("{:?}", i)).collect::<Vec<String>>();
         let middle = middle.join(" -> ");
         format!("r{}[{middle}]", self.id)
     }
-    pub fn new(instance: &'a VRPInstance, id: usize) -> Self {
-        Route { instance, stops: Vec::with_capacity(instance.num_customers), cost: 0f64, used_cap: 0, id }
+    pub fn new(instance: Arc<VRPInstance>, id: usize) -> Self {
+        Route { stops: Vec::with_capacity(instance.num_customers), instance, cost: 0f64, used_cap: 0, id }
     }
 
     pub fn stops(&self) -> &Vec<Stop> { &self.stops }

@@ -4,7 +4,8 @@ mod vrp_instance;
 mod solver;
 mod construct;
 
-use std::{env, time::Instant};
+use std::{env, sync::Arc, time::Instant};
+use solver::SolveParams;
 use vrp_instance::VRPInstance;
 use old_solver::Solver;
 
@@ -70,8 +71,9 @@ fn main() {
 
     let start = Instant::now();
     let vrp_instance = VRPInstance::new(file_name);
-    let mut solver = Solver::new(&vrp_instance);
-    let sol = solver.solve();
+    // let mut solver = Solver::new(vrp_instance);
+    // let sol = solver.solve();
+    let sol = solver::solve::<solver::TodoSolver>(Arc::new(vrp_instance), SolveParams{max_iters: 1000});
     let duration = start.elapsed();
 
     

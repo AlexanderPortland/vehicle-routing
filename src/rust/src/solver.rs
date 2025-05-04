@@ -1,41 +1,43 @@
+use std::sync::Arc;
+
 use crate::{old_solver::VRPSolution, vrp_instance::VRPInstance};
 
 // trait for a large neighborhood search (LNS) solver
-pub trait LNSSolver<'a> {
+pub trait LNSSolver {
     type DestroyResult;
 
-    fn new(instance: &'a VRPInstance) -> Self;
+    fn new(instance: Arc<VRPInstance>) -> Self;
 
     /// Construct an initial feasible solution.
-    fn construct(&mut self) -> VRPSolution<'a>;
+    fn construct(&mut self) -> VRPSolution;
 
     /// Partially destroy the solution.
     fn destroy(&mut self) -> Self::DestroyResult;
 
     /// Repair the solution and return the result.
-    fn repair(&mut self, res: Self::DestroyResult) -> VRPSolution<'a>;
+    fn repair(&mut self, res: Self::DestroyResult) -> VRPSolution;
 
     /// Update the solution to search from next.
-    fn update_search_location(&mut self, new_best: Option<(&VRPSolution<'a>, f64)>);
+    fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>);
 }
 
 pub struct SolveParams {
     pub max_iters: usize,
 }
 
-pub trait IterativeSolver<'a> {
-    fn new(instance: &'a VRPInstance) -> Self;
+pub trait IterativeSolver {
+    fn new(instance: Arc<VRPInstance>) -> Self;
 
-    fn initial_solution(&mut self) -> VRPSolution<'a>;
-    fn find_new_solution(&mut self) -> VRPSolution<'a>;
+    fn initial_solution(&mut self) -> VRPSolution;
+    fn find_new_solution(&mut self) -> VRPSolution;
 
     /// Update the solution to search from next.
-    fn update_search_location(&mut self, new_best: Option<(&VRPSolution<'a>, f64)>);
+    fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>);
 }
 
 /// Completely solve a VRP instance and return the best solution found.
-fn solve<'a, S: IterativeSolver<'a>>(instance: &'a VRPInstance, params: SolveParams) -> VRPSolution<'a> {
-    let mut solver = S::new(instance);
+pub fn solve<'a, S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams) -> VRPSolution {
+    let mut solver = S::new(instance.clone());
 
     let mut best = solver.initial_solution();
     let mut best_cost = best.cost();
@@ -56,33 +58,52 @@ fn solve<'a, S: IterativeSolver<'a>>(instance: &'a VRPInstance, params: SolvePar
     best
 }
 
-impl<'a, T> IterativeSolver<'a> for T
-    where T: LNSSolver<'a> {
-    fn new(instance: &'a VRPInstance) -> Self {
-        Self::new(&instance)
+impl<T> IterativeSolver for T
+    where T: LNSSolver {
+    fn new(instance: Arc<VRPInstance>) -> Self {
+        Self::new(instance)
     }
 
-    fn initial_solution(&mut self) -> VRPSolution<'a> {
+    fn initial_solution(&mut self) -> VRPSolution {
         self.construct()
     }
 
-    fn find_new_solution(&mut self) -> VRPSolution<'a> {
+    fn find_new_solution(&mut self) -> VRPSolution {
         let destroy_res = self.destroy();
         self.repair(destroy_res)
     }
 
-    fn update_search_location(&mut self, new_best: Option<(&VRPSolution<'a>, f64)>) {
+    fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>) {
         self.update_search_location(new_best);
     }
 }
 
+pub struct TodoSolver;
+
+impl IterativeSolver for TodoSolver {
+    fn new(instance: Arc<VRPInstance>) -> Self {
+        todo!()
+    }
+
+    fn find_new_solution(&mut self) -> VRPSolution {
+        todo!()
+    }
+
+    fn initial_solution(&mut self) -> VRPSolution {
+        todo!()
+    }
+
+    fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>) {
+        todo!()
+    }
+}
 
 mod tabu_solver {
     use crate::{common::Stop, old_solver::VRPSolution};
 
     const MAX_TABU: usize = 5;
-    pub struct TabuLocalSolver<'a> {
+    pub struct TabuLocalSolver {
         tabu: Vec<Stop>,
-        current: VRPSolution<'a>,
+        current: VRPSolution,
     }
 }

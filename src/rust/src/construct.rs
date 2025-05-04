@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use crate::{common::Stop, old_solver::VRPSolution, vrp_instance::VRPInstance};
 
 
 
-pub fn greedy<'a>(vrp_instance: &'a VRPInstance) -> Option<VRPSolution<'a>> {
-    let mut sol = VRPSolution::new(vrp_instance);
+pub fn greedy<'a>(vrp_instance: Arc<VRPInstance>) -> Option<VRPSolution> {
+    let mut sol = VRPSolution::new(vrp_instance.clone());
     for customer_idx in 1..vrp_instance.num_customers {
         let demand = vrp_instance.demand_of_customer[customer_idx];
         println!("considering customer {:?}", customer_idx);

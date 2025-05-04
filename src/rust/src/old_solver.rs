@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::VRPInstance;
@@ -7,21 +8,21 @@ use rand::{rng, Rng};
 use rand::rngs::ThreadRng;
 
 #[derive(Debug, Clone)]
-pub struct VRPSolution<'a> {
-    pub routes: Vec<Route<'a>>,
+pub struct VRPSolution {
+    pub routes: Vec<Route>,
 }
 
-impl<'a> VRPSolution<'a> {
-    pub fn new(vrp_instance: &'a VRPInstance) -> Self {
+impl VRPSolution {
+    pub fn new(vrp_instance: Arc<VRPInstance>) -> Self {
         VRPSolution {
             routes: (0..vrp_instance.num_vehicles)
                 .into_iter()
-                .map(|i| Route::new(&vrp_instance, i))
+                .map(|i| Route::new(vrp_instance.clone(), i))
                 .collect(),
         }
     }
 
-    pub fn is_valid_solution(&self, vrp_instance: &'a VRPInstance) -> bool {
+    pub fn is_valid_solution(&self, vrp_instance: &Arc<VRPInstance>) -> bool {
         todo!()
     }
 
@@ -71,23 +72,23 @@ impl<'a> VRPSolution<'a> {
 }
 
 #[derive(Clone)]
-pub struct Solver<'a> {
-    vrp_instance: &'a VRPInstance,
-    vrp_solution: VRPSolution<'a>,
+pub struct Solver {
+    vrp_instance: Arc<VRPInstance>,
+    vrp_solution: VRPSolution,
 }
 
-impl<'a> Solver<'a> {
-    pub fn new(vrp_instance: &'a VRPInstance) -> Self {
+impl Solver {
+    pub fn new(vrp_instance: Arc<VRPInstance>) -> Self {
         Solver {
-            vrp_solution: VRPSolution::new(&vrp_instance),
+            vrp_solution: VRPSolution::new(vrp_instance.clone()),
             vrp_instance,
         }
     }
 
-    pub fn construct(&mut self) {
-        self.vrp_solution
-            .get_greedy_construction(&self.vrp_instance);
-    }
+    // pub fn construct(&mut self) {
+    //     self.vrp_solution
+    //         .get_greedy_construction(&self.vrp_instance);
+    // }
 
     pub fn random_destroy(&mut self) -> Stop {
         let mut rng = rand::rng();
@@ -142,9 +143,9 @@ impl<'a> Solver<'a> {
         return true;
     }
 
-    pub fn solve(mut self) -> VRPSolution<'a> {
+    pub fn solve(mut self) -> VRPSolution {
         println!("\n\n------- INIT ------");
-        self.construct();
+        // self.construct();
         let mut incumbent_cost = self.vrp_solution.cost();
 
         println!("solver is {:?}", self.vrp_solution);
