@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{common::Stop, old_solver::VRPSolution, vrp_instance::VRPInstance};
 
 
-pub fn greedy<'a>(vrp_instance: Arc<VRPInstance>) -> Option<VRPSolution> {
+pub fn greedy(vrp_instance: &Arc<VRPInstance>) -> VRPSolution {
     let mut sol = VRPSolution::new(vrp_instance.clone());
     for customer_idx in 1..vrp_instance.num_customers {
         let demand = vrp_instance.demand_of_customer[customer_idx];
@@ -23,7 +23,7 @@ pub fn greedy<'a>(vrp_instance: Arc<VRPInstance>) -> Option<VRPSolution> {
                 break;
             }
         }
-        if !found { return None; }
+        if !found { panic!("greedy strategy doesn't work here!!"); }
     }
-    Some(sol)
+    sol
 }

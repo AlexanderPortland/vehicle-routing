@@ -12,7 +12,7 @@ impl DistanceMatrix {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Stop {
     cust_no: u16,
     capacity: usize
