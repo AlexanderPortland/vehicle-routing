@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use stats::SolveStats;
 
-use crate::{old_solver::VRPSolution, vrp_instance::VRPInstance};
+use crate::{common::VRPSolution, vrp_instance::VRPInstance};
 
 // trait for a large neighborhood search (LNS) solver
 pub trait LNSSolver {
@@ -39,7 +39,7 @@ pub trait IterativeSolver {
 
 #[cfg(debug_assertions)]
 mod stats {
-    use crate::old_solver::VRPSolution;
+    use crate::common::VRPSolution;
 
     pub struct SolveStats {
         improvements: Vec<(usize, f64)>,
@@ -82,7 +82,7 @@ mod stats {
 
 type SolveResult = (VRPSolution, SolveStats);
 /// Completely solve a VRP instance and return the best solution found.
-pub fn solve<'a, S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams) -> VRPSolution {
+pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams) -> VRPSolution {
     let initial_solution = (params.constructor)(&instance);
     let mut solver = S::new(instance.clone(), initial_solution.clone());
     let mut solve_stats = SolveStats::new();
@@ -97,6 +97,8 @@ pub fn solve<'a, S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolvePa
 
         solve_stats.update_stats(iter, &new_solution, best_cost - new_solution.cost());
         
+
+        // TODO: Update
         if new_solution.cost() < best_cost {
             (best_cost, best) = (new_solution.cost(), new_solution);
             solver.update_search_location(Some((&best, best_cost)));
@@ -122,21 +124,5 @@ impl<T> IterativeSolver for T
 
     fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>) {
         self.update_search_location(new_best);
-    }
-}
-
-pub struct TodoSolver;
-
-impl IterativeSolver for TodoSolver {
-    fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self {
-        todo!()
-    }
-
-    fn find_new_solution(&mut self) -> VRPSolution {
-        todo!()
-    }
-
-    fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>) {
-        todo!()
     }
 }

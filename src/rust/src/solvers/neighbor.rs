@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rand::{rng, Rng};
 
-use crate::{common::Stop, construct, old_solver::VRPSolution, solver::{IterativeSolver, LNSSolver}, vrp_instance::VRPInstance};
+use crate::{common::Stop, construct, common::VRPSolution, solver::{IterativeSolver, LNSSolver}, vrp_instance::VRPInstance};
 
 
 /// An LNS solver which greedily **removes the highest cost stop** from the solution,

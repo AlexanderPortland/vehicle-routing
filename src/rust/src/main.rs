@@ -1,4 +1,3 @@
-mod old_solver;
 mod common;
 mod vrp_instance;
 mod solver;
@@ -8,7 +7,6 @@ pub mod solvers;
 use std::{env, sync::Arc, time::Instant};
 use solver::SolveParams;
 use vrp_instance::VRPInstance;
-use old_solver::Solver;
 
 use serde_json::{json, to_string_pretty};
 use std::path::Path;
@@ -21,45 +19,6 @@ fn get_filename_from_path(path: &str) -> &str {
         .and_then(|filename| filename.to_str())
         .unwrap_or("")
 }
-
-// fn test_route_cost(vrp_instance: &VRPInstance) {
-//     let route = Route {
-//         stops: vec![1],
-//         known_cost: None,
-//         capacity_left: 0,
-//     };
-//     let expected_cost = 20.0;
-//     let actual_cost = route.cost(&vrp_instance.distance_matrix);
-
-//     println!("Expected cost: {}", expected_cost);
-//     println!("Actual cost: {}", actual_cost);
-
-//     let route = Route {
-//         stops: vec![],
-//         known_cost: None,
-//         capacity_left: 0,
-//     };
-//     let expected_cost = 0.0;
-//     let actual_cost = route.cost(&vrp_instance.distance_matrix);
-
-//     println!("Expected cost: {}", expected_cost);
-//     println!("Actual cost: {}", actual_cost);
-
-//     assert!(expected_cost == actual_cost);
-
-//     let route = solver::Route {
-//         stops: vec![1, 2, 3],
-//         known_cost: None,
-//         capacity_left: 0,
-//     };
-//     let expected_cost = 10_f64 + 10_f64 + 500_f64.sqrt() + 10_f64;
-//     let actual_cost = route.cost(&vrp_instance.distance_matrix);
-
-//     println!("Expected cost: {}", expected_cost);
-//     println!("Actual cost: {}", actual_cost);
-
-//     assert!(expected_cost == actual_cost);
-// }
 
 fn main() {
     // Check if a file name was provided as a command-line argument
@@ -75,8 +34,7 @@ fn main() {
 
     let start = Instant::now();
     let vrp_instance = VRPInstance::new(file_name);
-    // let mut solver = Solver::new(vrp_instance);
-    // let sol = solver.solve();
+
     let sol = solver::solve::<solvers::MoveLNSSolver>(
         Arc::new(vrp_instance), 
         SolveParams{

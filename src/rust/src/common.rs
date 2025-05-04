@@ -39,6 +39,66 @@ impl Stop {
     pub fn capacity(&self) -> usize { self.capacity }
 }
 
+
+#[derive(Debug, Clone)]
+pub struct VRPSolution {
+    pub routes: Vec<Route>,
+}
+
+impl VRPSolution {
+    pub fn new(vrp_instance: Arc<VRPInstance>) -> Self {
+        VRPSolution {
+            routes: (0..vrp_instance.num_vehicles)
+                .into_iter()
+                .map(|i| Route::new(vrp_instance.clone(), i))
+                .collect(),
+        }
+    }
+
+    pub fn is_valid_solution(&self, vrp_instance: &Arc<VRPInstance>) -> bool {
+        todo!()
+    }
+
+    pub fn cost(&self) -> f64 {
+        self.routes.iter().map(|route| route.cost()).sum()
+    }
+
+    pub fn to_string(&self) -> String {
+        let route_strings: Vec<String> = self.routes.iter().map(|route| {
+            let mut result = String::from("0");
+            
+            for stop in route.stops() {
+                result.push_str(&format!(" {}", stop.cust_no()));
+            }
+            
+            result.push_str(" 0");
+            result
+        }).collect();
+        
+        let mut combined = String::from("0 ");
+        combined.push_str(&route_strings.join(" "));
+        combined
+    }
+
+    pub fn to_file_string(&self) -> String {
+        let mut res = String::from(format!("{} 0\n", self.cost()));
+        let route_strings: Vec<String> = self.routes.iter().map(|route| {
+            let mut result = String::from("0");
+            
+            for stop in route.stops() {
+                result.push_str(&format!(" {}", stop.cust_no()));
+            }
+            
+            result.push_str(" 0\n");
+            result
+        }).collect();
+        res.push_str(&route_strings.join(""));
+        res
+    }
+}
+
+
+
 #[derive(Clone)]
 pub struct Route {
     instance: std::sync::Arc<VRPInstance>,
