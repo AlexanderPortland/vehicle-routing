@@ -38,8 +38,8 @@ fn main() {
     let sol = solver::solve::<solvers::SimpleLNSSolver>(
         Arc::new(vrp_instance), 
         SolveParams {
-            max_iters: 10000,
-            constructor: construct::greedy,
+            max_iters: 100,
+            constructor: construct::cheapest_insertion,
         }
     );
     let duration = start.elapsed();
