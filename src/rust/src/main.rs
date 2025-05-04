@@ -72,7 +72,7 @@ fn main() {
     let start = Instant::now();
     let vrp_instance = VRPInstance::new(file_path);
     let mut solver = Solver::new(&vrp_instance);
-    let sol = solver.solve();
+    let sol = solver.solve_best();
     let duration = start.elapsed();
 
 

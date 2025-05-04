@@ -18,9 +18,15 @@ pub struct Stop {
     capacity: usize
 }
 
+impl PartialEq for Stop {
+    fn eq(&self, other: &Self) -> bool {
+        self.cust_no == other.cust_no
+    }
+}
+
 impl std::fmt::Debug for Stop {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("Stop({})", self.cust_no))
+        f.write_fmt(format_args!("{}({:?})", self.cust_no, self.capacity))
     }
 }
 
@@ -51,7 +57,7 @@ impl<'a> std::fmt::Debug for Route<'a> {
 impl<'a> Route<'a> {
     pub fn to_string(&self) -> String {
         let mut s = "[".to_string();
-        let middle = self.stops.iter().map(|i| format!("{:?}", i.cust_no)).collect::<Vec<String>>();
+        let middle = self.stops.iter().map(|i| format!("{:?}", i)).collect::<Vec<String>>();
         let middle = middle.join(" -> ");
         format!("r{}[{middle}]", self.id)
     }
@@ -102,6 +108,27 @@ impl<'a> Route<'a> {
         return stop;
     }
 
+    pub fn speculative_replace_stop(&self, stop: &Stop, index: usize) -> (f64, bool) {
+        self.assert_sanity();
+        assert!(index <= self.stops.len());
+
+        let mut new_cost = self.cost;
+        let before = if index != 0 {
+            self.stops[index - 1].cust_no
+        } else { 0 };
+
+        let after = if index != self.stops.len() {
+            self.stops[index].cust_no
+        } else { 0 };
+
+        new_cost -= self.instance.distance_matrix.dist(before, self.stops[index].cust_no);
+        new_cost -= self.instance.distance_matrix.dist(self.stops[index].cust_no, after);
+        new_cost += self.instance.distance_matrix.dist(before, stop.cust_no);
+        new_cost += self.instance.distance_matrix.dist(stop.cust_no, after);
+
+        return (new_cost, self.used_cap - self.stops[index].capacity + stop.capacity <= self.instance.vehicle_capacity);
+    }
+
     // the change in cost for how much adding 
     pub fn speculative_add_stop(&self, stop: &Stop, index: usize) -> (f64, bool) {
         self.assert_sanity();
@@ -122,7 +149,6 @@ impl<'a> Route<'a> {
         new_cost += self.instance.distance_matrix.dist(stop.cust_no, after);
 
         let res = (new_cost, self.used_cap + stop.capacity <= self.instance.vehicle_capacity);
-        // println!("res for adding {:?} to {:?} (@{:?}) is {:?}", stop, self, index, res);
         return res;
     }
 
@@ -156,7 +182,7 @@ impl<'a> Route<'a> {
 
         // println!("spec remove for index {:?} of {:?} is {:?}", index, self, new_cost);
 
-        (new_cost, self.used_cap - self.stops[index].capacity >= self.instance.vehicle_capacity)
+        (new_cost, self.used_cap - self.stops[index].capacity <= self.instance.vehicle_capacity)
     }
 
     // -1      0         1
