@@ -91,7 +91,7 @@ fn main() {
         "Instance": file_name,
         "Time": (duration.as_secs_f64() * 100.0).round() / 100.0,
         "Result": sol.cost(),
-        "Solution": sol.to_stdout_string(),
+        "Solution": sol.to_string(),
     });
     
     println!("{}", serde_json::to_string(&output).unwrap());

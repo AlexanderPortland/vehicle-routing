@@ -69,6 +69,7 @@ impl VRPSolution {
         combined.push_str(&route_strings.join(" "));
         combined
     }
+
 }
 
 #[derive(Clone)]
