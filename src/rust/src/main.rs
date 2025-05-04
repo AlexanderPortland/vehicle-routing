@@ -33,7 +33,7 @@ fn main() {
     let file_name = get_filename_from_path(file_path);
 
     let start = Instant::now();
-    let vrp_instance = VRPInstance::new(file_name);
+    let vrp_instance = VRPInstance::new(file_path);
 
     let sol = solver::solve::<solvers::MoveLNSSolver>(
         Arc::new(vrp_instance), 

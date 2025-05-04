@@ -220,7 +220,7 @@ impl Route {
         new_cost += self.instance.distance_matrix.dist(stop.cust_no, after);
 
         let res = (new_cost, self.used_cap + stop.capacity <= self.instance.vehicle_capacity);
-        // println!("res for adding {:?} to {:?} (@{:?}) is {:?}", stop, self, index, res);
+
         return res;
     }
 
