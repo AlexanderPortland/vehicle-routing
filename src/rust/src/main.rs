@@ -40,9 +40,9 @@ fn main() {
     let sol = solver::solve::<solvers::MultiLNSSolver>(
         Arc::new(vrp_instance), 
         SolveParams {
-            max_iters: 10000,
+            max_iters: 0,
             patience: patience,
-            constructor: construct::sweep,
+            constructor: construct::clarke_wright,
         }
     );
     let duration = start.elapsed();

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use rand::seq::SliceRandom;
-use rand::{SeedableRng, rng};
+use rand::{rng, Rng, SeedableRng};
 
 use crate::common::Route;
 use crate::{common::Stop, common::VRPSolution, vrp_instance::VRPInstance};
@@ -81,7 +81,9 @@ pub fn sweep(vrp_instance: &Arc<VRPInstance>) -> VRPSolution {
         let angle_a = calculate_polar_angle(vrp_instance, a);
         let angle_b = calculate_polar_angle(vrp_instance, b);
         angle_a.total_cmp(&angle_b)
-    });
+    }); 
+    let shuffle_seed = rng().random_range(0..customer_nos.len());
+    customer_nos.rotate_left(shuffle_seed);
 
 
     for cust_no in customer_nos {
@@ -117,45 +119,84 @@ fn calculate_polar_angle(vrp_instance: &Arc<VRPInstance>, cust_no: usize) -> f64
     delta_y.atan2(delta_x)
 }
 
-pub fn clarke_wright(vrp_instance: &Arc<VRPInstance>) -> VRPSolution {
-    let mut sol = VRPSolution::new(vrp_instance.clone());
-    
-    let mut routes: Vec<Route> = Vec::new();
-    for cust_no in 1..vrp_instance.num_customers {
-        let new_route = Route::new(vrp_instance.clone(), cust_no);
-        routes.push(new_route);
-    }
+pub fn clarke_wright(vrp: &Arc<VRPInstance>) -> VRPSolution {
+    let n = vrp.num_customers;
 
-    let mut savings_matrix: Vec<Vec<f64>> = Vec::new();
-    for i in 0..vrp_instance.num_customers {
-        let mut row = Vec::new();
-        for j in 1..vrp_instance.num_customers {
-            row.push(vrp_instance.distance_matrix.dist(i, 0) + vrp_instance.distance_matrix.dist(0, j) - vrp_instance.distance_matrix.dist(i, j));
+    let mut routes: Vec<Route> = (1..n)
+        .map(|cust_no| Route::new(vrp.clone(), cust_no))
+        .collect();
+
+    let mut savings: Vec<(usize, usize, f64)> = Vec::with_capacity(((n - 1) * (n - 2) / 2) as usize);
+    for i in 1..n {
+        for j in i+1..n {
+            let s = vrp.distance_matrix.dist(i, 0)
+                  + vrp.distance_matrix.dist(0, j)
+                  - vrp.distance_matrix.dist(i, j);
+            savings.push((i, j, s));
         }
-        savings_matrix.push(row);
     }
+    savings.sort_unstable_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
 
-    loop {
-        let mut i = 0;
-        while i < routes.len() {
-            let route_a = &routes[i];
-            let route_b = &routes[i + 1];
+    for (i, j, s) in savings {
+        if routes.len() <= vrp.num_vehicles {
+            break;
+        }
 
-            let feasible = route_a.used_capacity() + route_b.used_capacity() <= vrp_instance.vehicle_capacity;
-            if feasible {
-                if savings_matrix[route_a.first()][route_b.last()] > 0.0 {
-                    // merge route a and b by connecting the last of route b to the first of route a
-                } else if savings_matrix[route_a.last()][route_b.first()] > 0.0 {
-                    // merge route a and b by connecting the last of route a to the first of route b
-                } else {
-                    i += 1;
+        let ri = match routes.iter().position(|r| r.contains_stop(i.try_into().unwrap())) {
+            Some(x) => x,
+            None => continue,
+        };
+        let rj = match routes.iter().position(|r| r.contains_stop(j.try_into().unwrap())) {
+            Some(x) => x,
+            None => continue,
+        };
+        if ri == rj {
+            continue;
+        }
+
+        // check for the "tail-to-head" merge: route_i.last == i, route_j.first == j
+        let (last_i, first_j) = (routes[ri].last(), routes[rj].first());
+        if last_i == i && first_j == j {
+            println!("merging");
+            let cap_i = routes[ri].used_capacity();
+            let cap_j = routes[rj].used_capacity();
+            if cap_i + cap_j <= vrp.vehicle_capacity {
+                // take route_j out, append its stops onto route_i
+                let mut tail = routes.remove(rj);
+                let mut head = routes.remove(ri);
+                // merge head <- tail
+                for stop in tail.stops().iter().cloned() {
+                    head.add_stop_to_index(stop, head.stops().len());
                 }
-            } else {
-                i += 1;
+                routes.insert(ri, head);
             }
+        }
+        else {
             
+            let (last_j, first_i) = (routes[rj].last(), routes[ri].first());
+            if last_j == j && first_i == i {
+                println!("merging");
+                let cap_i = routes[ri].used_capacity();
+                let cap_j = routes[rj].used_capacity();
+                if cap_i + cap_j <= vrp.vehicle_capacity {
+                    let mut tail = routes.remove(ri);
+                    let mut head = routes.remove(rj);
+                    // merge head <- tail
+                    for stop in tail.stops().iter().cloned() {
+                        head.add_stop_to_index(stop, head.stops().len());
+                    }
+                    routes.insert(rj, head);
+                }
+            }
         }
     }
+    for r in routes.iter() {
+        println!("{:?}", r);
+    }
 
+    let mut sol = VRPSolution::new(vrp.clone());
+    for (i, route) in routes.iter().enumerate() {
+        sol.routes[i] = route.clone();
+    }
     sol
 }
