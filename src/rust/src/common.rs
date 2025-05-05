@@ -339,6 +339,30 @@ impl Route {
         (new_cost, self.used_cap - self.stops[index].capacity <= self.instance.vehicle_capacity)
     }
 
+    pub fn cost_if_cust_no_was(&self, new_stop: &Stop, index: usize) -> f64 {
+        self.assert_sanity();
+        assert!(index < self.stops.len());
+        // assert!(self.stops[index])
+        let old_stop = &self.stops[index];
+
+        let mut new_cost = self.cost; // TODO: could change to be relative
+
+        let before = if index != 0 {
+            self.stops[index - 1].cust_no
+        } else { 0 };
+
+        let after = if index != (self.stops.len() - 1) {
+            self.stops[index + 1].cust_no
+        } else { 0 };
+
+        new_cost -= self.instance.distance_matrix.dist(before, old_stop.cust_no);
+        new_cost -= self.instance.distance_matrix.dist(old_stop.cust_no, after);
+        new_cost += self.instance.distance_matrix.dist(before, new_stop.cust_no);
+        new_cost += self.instance.distance_matrix.dist(new_stop.cust_no, after);
+
+        new_cost
+    }
+
     // -1      0         1
     // 0 -> stop[0] -> stop[1] -...-> stop[len - 1] -> 0
     /// The cost of going from the previous index to `index`. (if `index` == `len`, cost of going home after...)

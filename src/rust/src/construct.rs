@@ -102,7 +102,9 @@ pub fn sweep(vrp_instance: &Arc<VRPInstance>) -> VRPSolution {
         }
         if !found { panic!("sweep strategy failed to assigned customer"); }
     }
-    sol
+
+    crate::explode::single_swap::naive_greedy(sol, vrp_instance).0
+    // sol
 }
 
 fn calculate_polar_angle(vrp_instance: &Arc<VRPInstance>, cust_no: usize) -> f64 {
