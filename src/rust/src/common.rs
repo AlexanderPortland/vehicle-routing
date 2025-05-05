@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{cmp::{max, min}, collections::{HashMap, HashSet}, sync::Arc};
 
 use crate::vrp_instance::VRPInstance;
 
@@ -120,6 +120,45 @@ impl VRPSolution {
         }).collect();
         res.push_str(&route_strings.join(""));
         res
+    }
+}
+
+impl VRPSolution {
+    pub fn distance(a: &Self, b: &Self, instance: &Arc<VRPInstance>) -> f64 {
+        let mut dist = 0;
+        let map_a = a.make_vector(instance);
+        let map_b = b.make_vector(instance);
+        assert!(map_a.len() == map_b.len());
+        assert!(map_b.len() == instance.num_customers * (instance.num_customers - 1));
+
+        for ((_, count_a), (_, count_b)) in map_a.into_iter().zip(map_b.into_iter()) {
+            dist += (count_a - count_b).pow(2);
+        }
+
+        (dist as f64).sqrt()
+    }
+
+    fn make_vector(&self, instance: &Arc<VRPInstance>) -> HashMap<(u16, u16), usize> {
+        let mut map = HashMap::new();
+
+        for r in &self.routes {
+            for el in &r.stops {
+                for other_cust in (el.cust_no + 1)..instance.num_customers.try_into().unwrap() {
+                    let entry = (el.cust_no, other_cust);
+                    assert_eq!(entry, (min(el.cust_no, other_cust), max(el.cust_no, other_cust)));
+                    
+                    let val = match r.stops.iter().filter(|s| s.cust_no == other_cust).count() {
+                        count if count <= 1 => count,
+                        wacky => panic!("wacky count {wacky} of cust no {other_cust:?} in {r:?}"),
+                    };
+
+                    let insert_res = map.insert(entry, val);
+                    assert!(insert_res.is_none());
+                }
+            }
+        }
+
+        map
     }
 }
 

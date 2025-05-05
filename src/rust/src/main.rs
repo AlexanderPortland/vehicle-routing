@@ -2,6 +2,7 @@ mod common;
 mod vrp_instance;
 mod solver;
 mod construct;
+mod explode;
 pub mod solvers;
 
 use std::{env, sync::Arc, time::Instant};
