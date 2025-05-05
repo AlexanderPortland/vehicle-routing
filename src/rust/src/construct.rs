@@ -40,6 +40,7 @@ pub fn cheapest_insertion(vrp_instance: &Arc<VRPInstance>) -> VRPSolution {
     // randomly shuffled
     // let seed = 42u64;
     // let mut rng = StdRng::seed_from_u64(seed);
+    
     let mut rng = rng();
     customer_nos.shuffle(&mut rng);
 

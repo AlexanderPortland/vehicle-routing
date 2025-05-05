@@ -4,6 +4,13 @@ use stats::SolveStats;
 
 use crate::{common::VRPSolution, vrp_instance::VRPInstance};
 
+pub struct SolveParams {
+    pub max_iters: usize,
+    /// jump after this many stagnant iterations
+    pub patience: usize,
+    pub constructor: fn(&Arc<VRPInstance>) -> VRPSolution,
+}
+
 // trait for a large neighborhood search (LNS) solver
 pub trait LNSSolver {
     type DestroyResult;
@@ -16,6 +23,8 @@ pub trait LNSSolver {
     /// Repair the solution and return the result.
     fn repair(&mut self, res: Self::DestroyResult) -> VRPSolution;
 
+    fn get_stats_mut(&mut self) -> &mut SolveStats;
+
     // / Update the solution to search from next.
     // fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>);
     fn jump_to_solution(&mut self, sol: VRPSolution);
@@ -24,55 +33,47 @@ pub trait LNSSolver {
     fn update_tabu(&mut self, res: &Self::DestroyResult) {}
 }
 
-pub struct SolveParams {
-    pub max_iters: usize,
-    /// jump after this many stagnant iterations
-    pub patience: usize,
-    pub constructor: fn(&Arc<VRPInstance>) -> VRPSolution,
-}
-
 pub trait IterativeSolver {
     fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self;
 
     fn find_new_solution(&mut self) -> VRPSolution;
 
     fn jump_to_solution(&mut self, sol: VRPSolution);
+
+    fn get_stats_mut(&mut self) -> &mut SolveStats;
 }
 
 #[cfg(debug_assertions)]
-mod stats {
+pub mod stats {
+    use std::collections::HashMap;
+
     use crate::common::VRPSolution;
 
     #[derive(Debug)]
     pub struct SolveStats {
+        iterations: usize,
         improvements: Vec<(usize, f64)>,
         restarts: Vec<usize>,
-        small_improvements: usize,
+        cust_change_freq: HashMap<usize, usize>,
+        route_change_freq: HashMap<usize, usize>,
     }
     
     impl SolveStats {
         pub fn new() -> Self {
             SolveStats { 
+                iterations: 0,
                 improvements: Vec::new(),
                 restarts: Vec::new(),
-                small_improvements: 0,
+                cust_change_freq: HashMap::new(),
+                route_change_freq: HashMap::new(),
             }
         }
 
-        pub fn restart_count(&self) -> usize {
-            self.restarts.len()
-        }
-
-        pub fn update_stats(&mut self, iter: usize, new_sol: &VRPSolution, improvement_on_best: f64) {
-            // println!("iter {} improved by {:?}", iter, improvement);
-            if improvement_on_best > 0f64 {
-                println!("update stats says new best!!");
+        pub fn update_on_iter(&mut self, iter: usize, new_sol: &VRPSolution, improvement_on_best: f64) {
+            if improvement_on_best > 0.01 {
                 self.improvements.push((iter, new_sol.cost()));
-                if improvement_on_best < 0.01 {
-                    self.small_improvements += 1;
-                    // println!("SMALL IMPROVEMENT");
-                }
             }
+            self.iterations += 1;
         }
 
         pub fn on_restart(&mut self, iter: usize) {
@@ -101,12 +102,11 @@ mod stats {
 
 
 type SolveResult = (VRPSolution, SolveStats);
+
 /// Completely solve a VRP instance and return the best solution found.
 pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams) -> VRPSolution {
-    println!("in solve...");
     let initial_solution = (params.constructor)(&instance);
     let mut solver = S::new(instance.clone(), initial_solution.clone());
-    let mut solve_stats = SolveStats::new();
 
     let mut best = initial_solution; // TODO: stop cloning these
     let mut best_cost = best.cost();
@@ -118,13 +118,9 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
         debug_assert!(new_solution.is_valid_solution(&instance));
 
         let new_cost = new_solution.cost();
-        solve_stats.update_stats(iter, &new_solution, best_cost - new_cost);
+        solver.get_stats_mut().update_on_iter(iter, &new_solution, best_cost - new_cost);
         
-
-        // TODO: Update
-        // println!("iter {:?} has cost {:?}", iter, new_solution.cost());
         if new_cost < best_cost {
-            println!("NEW BEST iter {:?} has cost {:?}", iter, new_cost);
             (best_cost, best) = (new_solution.cost(), new_solution);
         } else {
             if iter % 20 == 0 {println!("iter {:?} has cost {:?}", iter, new_cost);}
@@ -132,37 +128,31 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
 
         if last_cost < new_cost || (new_cost - last_cost).abs() < 0.01 {
             // no improvement
-            println!("stagnating at iter {:?} (new cost {:?}, last {:?})", iter, new_cost, last_cost);
             stagnant_iterations += 1;
         } else {
-            println!("NOT stagnating at iter {:?} (new cost {:?}, last {:?})", iter, new_cost, last_cost);
             stagnant_iterations = 0;
         }
 
         last_cost = new_cost;
 
         if stagnant_iterations > params.patience {
-            println!("best is {:?}", best_cost);
-            println!("restarting bc of {} iters of stagnation", params.patience);
-            // todo!();
             stagnant_iterations = 0;
             solver.jump_to_solution((params.constructor)(&instance));
-            solve_stats.on_restart(iter);
+            solver.get_stats_mut().on_restart(iter);
         }
-
-        
     }
 
-    println!("solve stats {:?}", solve_stats);
-    // println!("{:?} restarts", solve_stats.restart_count());
-
+    println!("Stats: {:?}", solver.get_stats_mut());
     best
 }
 
-impl<T> IterativeSolver for T
-    where T: LNSSolver {
+impl<T> IterativeSolver for T where T: LNSSolver {
     fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self {
         Self::new(instance, initial_solution)
+    }
+
+    fn get_stats_mut(&mut self) -> &mut SolveStats {
+        self.get_stats_mut()
     }
 
     fn find_new_solution(&mut self) -> VRPSolution {
@@ -174,8 +164,4 @@ impl<T> IterativeSolver for T
     fn jump_to_solution(&mut self, sol: VRPSolution) {
         self.jump_to_solution(sol);
     }
-
-    // fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>) {
-    //     self.update_search_location(new_best);
-    // }
 }

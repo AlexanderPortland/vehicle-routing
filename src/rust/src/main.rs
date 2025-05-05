@@ -40,7 +40,7 @@ fn main() {
         SolveParams {
             max_iters: 10000,
             patience: 100,
-            constructor: construct::cheapest_insertion,
+            constructor: construct::sweep,
         }
     );
     let duration = start.elapsed();
