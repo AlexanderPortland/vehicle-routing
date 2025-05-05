@@ -20,7 +20,6 @@ impl std::fmt::Debug for SwapResult {
 }
 
 pub mod single_swap {
-    use core::f64;
     use std::{sync::Arc, time::Instant};
 
     use rand::seq::SliceRandom;
@@ -66,12 +65,13 @@ pub mod single_swap {
                                         b_route.cost_if_cust_no_was(a, b_i);
 
                         if (new_cost < initial_cost) {
+                            if (initial_cost - new_cost).abs() < 0.01 { continue; }
                             println!("VALID, GOOD SWAP FOUND!!");
                             println!("swapping {:?} from {:?} to {:?} from {:?}", a, a_route, b, b_route);
                             println!("new cost {:?} (vs {:?})", new_cost, initial_cost);
                             // println!("under caps are {:?}", (a_under_cap, b_under_cap));
                             // good_swaps += 1;
-                            // let improvement = initial_cost - new_cost;
+                            let improvement = initial_cost - new_cost;
                             println!("in {:?}", start.elapsed());
 
                             swap = Some(SwapResult { a_route_i, a_i, a_stop: *a, b_route_i, b_i, b_stop: *b });
@@ -103,9 +103,14 @@ pub mod single_swap {
             // todo!()
 
             // TODO: do swap here
+            println!("yes swappies found :D");
+        } else {
+            println!("no swappies found :(");
+            return (sol, None);
+            // panic!();
         }
-        let new_distance = dbg!(VRPSolution::distance(&old, &sol, vrp_instance));
-        todo!();
+        // let new_distance = dbg!(VRPSolution::distance(&old, &sol, vrp_instance));
+        // todo!();
 
         (sol, swap)
     }
