@@ -34,12 +34,13 @@ fn main() {
 
     let start = Instant::now();
     let vrp_instance = VRPInstance::new(file_path);
+    let patience = vrp_instance.num_customers / 3;
 
-    let sol = solver::solve::<solvers::SimpleLNSSolver>(
+    let sol = solver::solve::<solvers::MultiLNSSolver>(
         Arc::new(vrp_instance), 
         SolveParams {
             max_iters: 10000,
-            patience: 100,
+            patience: patience,
             constructor: construct::sweep,
         }
     );

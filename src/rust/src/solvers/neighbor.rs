@@ -1,21 +1,24 @@
-use std::{collections::{HashMap, VecDeque}, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 
-use crate::common::{Stop, VRPSolution};
+use crate::common::{Route, Stop, VRPSolution};
 use crate::construct;
+use crate::solver::stats::SolveStats;
 use crate::solver::{IterativeSolver, LNSSolver};
 use crate::vrp_instance::VRPInstance;
-use crate::solver::stats::SolveStats;
 
 /// An LNS solver which greedily **removes the highest cost stop** from the solution,
 /// **inserting it at the lowest cost location**.
 pub struct SimpleLNSSolver {
     instance: Arc<VRPInstance>,
-    tabu: VecDeque<Stop>,
+    stop_tabu: VecDeque<Stop>,
     current: VRPSolution,
     moves: HashMap<Stop, usize>,
-    stats: SolveStats
+    stats: SolveStats,
 }
 
 impl LNSSolver for SimpleLNSSolver {
@@ -23,31 +26,51 @@ impl LNSSolver for SimpleLNSSolver {
     type DestroyResult = (Stop, usize);
 
     fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self {
-        SimpleLNSSolver { tabu: VecDeque::new(), current: initial_solution, moves: HashMap::new(), instance, stats: SolveStats::new() }
+        SimpleLNSSolver {
+            stop_tabu: VecDeque::new(),
+            current: initial_solution,
+            moves: HashMap::new(),
+            instance,
+            stats: SolveStats::new(),
+        }
+    }
+
+    fn current(&self) -> VRPSolution {
+        return self.current.clone();
     }
 
     fn destroy(&mut self) -> Self::DestroyResult {
-        self.remove_random_stop()
+        let (stop, route_idx) = self.remove_random_stop();
+        *self
+            .stats
+            .cust_change_freq
+            .entry(stop.cust_no().try_into().unwrap())
+            .or_insert(0) += 1;
+        *self.stats.route_remove_freq.entry(route_idx).or_insert(0) += 1;
+        return (stop, route_idx);
     }
 
     fn get_stats_mut(&mut self) -> &mut SolveStats {
         &mut self.stats
     }
 
-    fn repair(&mut self, res: Self::DestroyResult) -> VRPSolution {
-        Self::reinsert_in_best_spot(&mut self.current, res.0);
-        self.current.clone()
+    fn repair(&mut self, res: Self::DestroyResult) -> Result<VRPSolution, String> {
+        let route_idx = Self::reinsert_in_best_spot(&mut self.current, res.0);
+        *self.stats.route_add_freq.entry(route_idx).or_insert(0) += 1;
+        Ok(self.current.clone())
     }
 
     fn jump_to_solution(&mut self, sol: VRPSolution) {
         self.current = sol;
-        self.tabu.clear();
+
+        // ! UNDO THIS LATER
+        // self.tabu.clear();
     }
 
     fn update_tabu(&mut self, res: &Self::DestroyResult) {
-        self.tabu.push_back(res.0);
-        if self.tabu.len() >= (self.instance.num_customers) { 
-            self.tabu.pop_front(); 
+        self.stop_tabu.push_back(res.0);
+        if self.stop_tabu.len() >= (self.instance.num_customers / 10) {
+            self.stop_tabu.pop_front();
         }
 
         // TODO: add this to the stats object
@@ -59,25 +82,30 @@ impl LNSSolver for SimpleLNSSolver {
 
 impl SimpleLNSSolver {
     fn remove_random_stop(&mut self) -> (Stop, usize) {
-        let tabu = &self.tabu;
+        let tabu = &self.stop_tabu;
         // let (mut worst_spot_r, mut worst_spot_i, mut worst_spot_cost) = (100000, 100000, f64::MIN);
         let sol = &mut self.current;
 
         let mut feas_vals = Vec::new();
         for (r, route) in sol.routes.iter().enumerate() {
             for i in 0..(route.stops().len()) {
-                if tabu.contains(&route.stops()[i]) { continue; }
+                if tabu.contains(&route.stops()[i]) {
+                    continue;
+                }
                 feas_vals.push((r, i));
             }
         }
 
-        let (chosen_spot_r, chosen_spot_i) = *feas_vals.get(rng().random_range(0..feas_vals.len())).unwrap();
-        let res = sol.routes[chosen_spot_r].remove_stop(chosen_spot_i);
+        let (chosen_spot_r, chosen_spot_i) = *feas_vals
+            .get(rng().random_range(0..feas_vals.len()))
+            .unwrap();
+        let res = sol.routes[chosen_spot_r].remove_stop_at_index(chosen_spot_i);
         return (res, chosen_spot_r);
     }
 
-    fn reinsert_in_best_spot(sol: &mut VRPSolution, stop: Stop) {
-        let (mut best_spot_r, mut best_spot_i, mut best_spot_cost_increase) = (100000, 100000, f64::MAX);
+    fn reinsert_in_best_spot(sol: &mut VRPSolution, stop: Stop) -> usize {
+        let (mut best_spot_r, mut best_spot_i, mut best_spot_cost_increase) =
+            (100000, 100000, f64::MAX);
 
         let mut valid = Vec::new();
 
@@ -87,7 +115,9 @@ impl SimpleLNSSolver {
 
                 // we want the one that will increase the new cost by the least, so minimize
                 let cost_increase = new_cost - route.cost();
-                if feas { valid.push((r, i)); }
+                if feas {
+                    valid.push((r, i));
+                }
                 if feas && cost_increase < best_spot_cost_increase {
                     (best_spot_r, best_spot_i) = (r, i);
                     best_spot_cost_increase = cost_increase;
@@ -100,7 +130,6 @@ impl SimpleLNSSolver {
             (best_spot_r, best_spot_i) = *valid.get(i).unwrap();
         }
         sol.routes[best_spot_r].add_stop_to_index(stop, best_spot_i);
+        return best_spot_r;
     }
 }
-
-

@@ -1,0 +1,162 @@
+use std::{
+    cmp::Reverse, collections::{HashMap, VecDeque}, sync::Arc
+};
+
+use rand::{rng, rngs::ThreadRng, seq::SliceRandom, Rng};
+
+use crate::common::{Route, Stop, VRPSolution};
+use crate::construct;
+use crate::solver::stats::SolveStats;
+use crate::solver::{IterativeSolver, LNSSolver};
+use crate::vrp_instance::VRPInstance;
+
+/// An LNS solver which greedily **removes the highest cost stop** from the solution,
+/// **inserting it at the lowest cost location**.
+pub struct MultiLNSSolver {
+    instance: Arc<VRPInstance>,
+    stop_tabu: VecDeque<usize>,
+    current: VRPSolution,
+    stats: SolveStats,
+    rng: ThreadRng,
+}
+
+impl LNSSolver for MultiLNSSolver {
+    /// corresponding to the (cust_no, route #) that was removed
+    type DestroyResult = Vec<(Stop, usize)>;
+
+    fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self {
+        MultiLNSSolver {
+            stop_tabu: VecDeque::new(),
+            current: initial_solution,
+            instance,
+            stats: SolveStats::new(),
+            rng: rand::rng()
+        }
+    }
+
+    fn current(&self) -> VRPSolution {
+        return self.current.clone();
+    }
+
+    fn destroy(&mut self) -> Self::DestroyResult {
+        // TODO: tune the number of stops to remove / have it be variable??
+        // println!("Cost: {}", self.current.cost());
+        // println!("Solution before destroying: {:?}", self.current);
+        let removed_stops = self.remove_n_random_stops(9);
+
+        for (stop, route_idx) in removed_stops.iter() {
+            *self
+                .stats
+                .cust_change_freq
+                .entry(stop.cust_no().try_into().unwrap())
+                .or_insert(0) += 1;
+            *self.stats.route_remove_freq.entry(*route_idx).or_insert(0) += 1;
+        }
+        // println!("Removing: {:?}", removed_stops);
+        return removed_stops;
+    }
+
+    fn get_stats_mut(&mut self) -> &mut SolveStats {
+        &mut self.stats
+    }
+
+    fn repair(&mut self, res: Self::DestroyResult) -> Result<VRPSolution, String> {
+        let route_idxs = self.reinsert_n_stops_in_best_spots(res)?;
+
+        for route_idx in route_idxs {
+            *self.stats.route_add_freq.entry(route_idx).or_insert(0) += 1;
+        }
+        // println!("Current solution: {:?}", self.current);
+        Ok(self.current.clone())
+    }
+
+    fn jump_to_solution(&mut self, sol: VRPSolution) {
+        self.current = sol;
+
+        // ! UNDO THIS LATER
+        // self.tabu.clear();
+    }
+
+    fn update_tabu(&mut self, res: &Self::DestroyResult) {
+        for (stop, _) in res {
+            self.stop_tabu.push_back(stop.cust_no().try_into().unwrap());
+        }
+        
+        while self.stop_tabu.len() > (self.instance.num_customers / 10) {
+            self.stop_tabu.pop_front();
+        }
+    }
+}
+
+impl MultiLNSSolver {
+    fn remove_n_random_stops(&mut self, n: usize) -> Vec<(Stop, usize)> {
+        assert!(n > 0);
+
+        let tabu = &self.stop_tabu;
+        let sol = &mut self.current;
+
+        let mut customer_nos: Vec<usize> = (1..self.instance.num_customers).filter(|x| !tabu.contains(x)).collect();
+        customer_nos.shuffle(&mut self.rng);
+        customer_nos.truncate(n);
+
+        let mut res = Vec::new();
+
+        // TODO: Keep a hashmap (cust_no --> route_idx) for quick removals
+        for cust_no in customer_nos {
+            for (route_idx, route) in sol.routes.iter_mut().enumerate() {
+                if let Some(index) = route.index_of_stop(cust_no.try_into().unwrap()) {
+                    let removed_stop = route.remove_stop_at_index(index);
+                    res.push((removed_stop, route_idx));
+                    break;
+                }
+            }
+        }
+        res
+    }
+
+    fn reinsert_n_stops_in_best_spots(&mut self, removed_stops: Vec<(Stop, usize)>) -> Result<Vec<usize>, String> {
+        let mut res = Vec::new();
+        let mut removed_stops = removed_stops.clone();
+        removed_stops.sort_by_key(|x| Reverse(x.0.capacity()));
+        for (stop, _) in removed_stops {
+            res.push(self.reinsert_in_best_spot(stop)?);
+        }
+        Ok(res)
+    }
+
+    fn reinsert_in_best_spot(&mut self, stop: Stop) -> Result<usize, String> {
+        // println!("Reinserting: {:?}", stop);
+        let (mut best_spot_r, mut best_spot_i, mut best_spot_cost_increase) =
+            (usize::MAX, usize::MAX, f64::MAX);
+
+        let mut valid = Vec::new();
+
+        for (r, route) in self.current.routes.iter().enumerate() {
+            for i in 0..(route.stops().len() + 1) {
+                let (new_cost, feas) = route.speculative_add_stop(&stop, i);
+
+                // we want the one that will increase the new cost by the least, so minimize
+                let cost_increase = new_cost - route.cost();
+                if feas {
+                    valid.push((r, i));
+                }
+                if feas && cost_increase < best_spot_cost_increase {
+                    (best_spot_r, best_spot_i) = (r, i);
+                    best_spot_cost_increase = cost_increase;
+                }
+            }
+        }
+        if best_spot_r == usize::MAX {
+            return Err("no place to put customer".to_string());
+        }
+
+        if rng().random_bool(0.02_f64) {
+            let i = rng().random_range(0..valid.len());
+            (best_spot_r, best_spot_i) = *valid.get(i).unwrap();
+        }
+        self.current.routes[best_spot_r].add_stop_to_index(stop, best_spot_i);
+
+        // println!("Solution after inserting {:?}: {:?}", stop, self.current);
+        return Ok(best_spot_r);
+    }
+}

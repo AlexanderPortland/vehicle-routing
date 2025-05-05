@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rand::Rng;
 use stats::SolveStats;
 
 use crate::{common::VRPSolution, vrp_instance::VRPInstance};
@@ -17,11 +18,13 @@ pub trait LNSSolver {
 
     fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self;
 
+    fn current(&self) -> VRPSolution;
+
     /// Partially destroy the solution.
     fn destroy(&mut self) -> Self::DestroyResult;
 
     /// Repair the solution and return the result.
-    fn repair(&mut self, res: Self::DestroyResult) -> VRPSolution;
+    fn repair(&mut self, res: Self::DestroyResult) -> Result<VRPSolution, String>;
 
     fn get_stats_mut(&mut self) -> &mut SolveStats;
 
@@ -36,14 +39,16 @@ pub trait LNSSolver {
 pub trait IterativeSolver {
     fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self;
 
-    fn find_new_solution(&mut self) -> VRPSolution;
+    fn find_new_solution(&mut self) -> (VRPSolution, Option<VRPSolution>);
 
     fn jump_to_solution(&mut self, sol: VRPSolution);
 
     fn get_stats_mut(&mut self) -> &mut SolveStats;
+
+    fn cost(&self) -> f64;
 }
 
-#[cfg(debug_assertions)]
+// #[cfg(debug_assertions)]
 pub mod stats {
     use std::collections::HashMap;
 
@@ -51,11 +56,12 @@ pub mod stats {
 
     #[derive(Debug)]
     pub struct SolveStats {
-        iterations: usize,
-        improvements: Vec<(usize, f64)>,
-        restarts: Vec<usize>,
-        cust_change_freq: HashMap<usize, usize>,
-        route_change_freq: HashMap<usize, usize>,
+        pub iterations: usize,
+        pub improvements: Vec<(usize, f64)>,
+        pub restarts: Vec<usize>,
+        pub cust_change_freq: HashMap<usize, usize>,
+        pub route_remove_freq: HashMap<usize, usize>,
+        pub route_add_freq: HashMap<usize, usize>,
     }
     
     impl SolveStats {
@@ -65,7 +71,8 @@ pub mod stats {
                 improvements: Vec::new(),
                 restarts: Vec::new(),
                 cust_change_freq: HashMap::new(),
-                route_change_freq: HashMap::new(),
+                route_add_freq: HashMap::new(),
+                route_remove_freq: HashMap::new(),
             }
         }
 
@@ -82,23 +89,25 @@ pub mod stats {
     }
 }
 
-#[cfg(not(debug_assertions))]
-mod stats {
-    use crate::common::VRPSolution;
 
-    #[derive(Debug)]
-    pub struct SolveStats();
+// Commenting out for now b/c stats is used in neighbors.rs — Julian
+// #[cfg(not(debug_assertions))]
+// mod stats {
+//     use crate::common::VRPSolution;
 
-    impl SolveStats {
-        pub fn new() -> Self {
-            SolveStats()
-        }
+//     #[derive(Debug)]
+//     pub struct SolveStats();
 
-        pub fn update_stats(&mut self, iter: usize, new_sol: &VRPSolution, improvement: f64) {}
+//     impl SolveStats {
+//         pub fn new() -> Self {
+//             SolveStats()
+//         }
 
-        pub fn on_restart(&mut self, iter: usize) {}
-    }
-}
+//         pub fn update_stats(&mut self, iter: usize, new_sol: &VRPSolution, improvement: f64) {}
+
+//         pub fn on_restart(&mut self, iter: usize) {}
+//     }
+// }
 
 
 type SolveResult = (VRPSolution, SolveStats);
@@ -112,30 +121,52 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
     let mut best_cost = best.cost();
     let mut stagnant_iterations = 0;
     let mut last_cost = best.cost();
+    let mut rng = rand::rng();
 
     for iter in 0..params.max_iters {
-        let new_solution = solver.find_new_solution();
-        debug_assert!(new_solution.is_valid_solution(&instance));
+        let (old_solution, new_solution) = solver.find_new_solution();
+        let new_solution = match new_solution {
+            Some(sol) => sol,
+            None =>  {
+                println!("failed to produce feasible new solution; reverting to old solution");
+                solver.jump_to_solution(old_solution);
+                continue   
+            }
+        };
+        
+
 
         let new_cost = new_solution.cost();
         solver.get_stats_mut().update_on_iter(iter, &new_solution, best_cost - new_cost);
         
         if new_cost < best_cost {
+            println!("new_best: {}", best_cost);
             (best_cost, best) = (new_solution.cost(), new_solution);
-        } else {
-            if iter % 20 == 0 {println!("iter {:?} has cost {:?}", iter, new_cost);}
         }
-
-        if last_cost < new_cost || (new_cost - last_cost).abs() < 0.01 {
+        // TODO: also seems like its worth doing 2-opt... how would i do that/
+        // TODO: restart from prev best + perturb; restart when new best hasn't been improved in x trials
+        // TODO: also for multithreading could init from different algos for diff threads?
+        // TODO: => intiiate n swaps for perturb and make sure that they are real swaps you know?
+        if new_cost + 0.1 < last_cost {
+            // improvement
+            stagnant_iterations = 0;
+            // solver already has new_solution set as current
+        } else {
             // no improvement
             stagnant_iterations += 1;
-        } else {
-            stagnant_iterations = 0;
+
+            // simmulated annealing — with 0.1 probability, do not revert to the old solution (i.e. accept the new, worse solution)
+            if rng.random_bool(0.9) {
+                // revert to old solution
+                solver.jump_to_solution(old_solution);
+            }
         }
+        if iter % 100 == 0 {println!("iter {:?} has cost {:?}", iter, solver.cost());}
 
         last_cost = new_cost;
 
         if stagnant_iterations > params.patience {
+            println!("Restarting...");
             stagnant_iterations = 0;
             solver.jump_to_solution((params.constructor)(&instance));
             solver.get_stats_mut().on_restart(iter);
@@ -155,13 +186,22 @@ impl<T> IterativeSolver for T where T: LNSSolver {
         self.get_stats_mut()
     }
 
-    fn find_new_solution(&mut self) -> VRPSolution {
+    fn find_new_solution(&mut self) -> (VRPSolution, Option<VRPSolution>) {
+        let current_sol = self.current();
         let destroy_res = self.destroy();
         self.update_tabu(&destroy_res);
-        self.repair(destroy_res)
+        let new_sol: Option<VRPSolution> = match self.repair(destroy_res) {
+            Ok(sol) => Some(sol),
+            Err(_) => None
+        };
+        (current_sol, new_sol)
     }
     
     fn jump_to_solution(&mut self, sol: VRPSolution) {
         self.jump_to_solution(sol);
+    }
+
+    fn cost(&self) -> f64 {
+        self.current().cost()
     }
 }

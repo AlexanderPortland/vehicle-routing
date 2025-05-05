@@ -42,9 +42,19 @@ impl Stop {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct VRPSolution {
     pub routes: Vec<Route>,
+}
+
+
+impl std::fmt::Debug for VRPSolution {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for r in self.routes.iter() {
+            f.write_fmt(format_args!("{:?}\n", r)).unwrap()
+        }
+        Ok(())
+    }
 }
 
 impl VRPSolution {
@@ -156,6 +166,10 @@ impl Route {
         self.stops.iter().any(|a|{ a.cust_no == cust_no })
     }
 
+    pub fn index_of_stop(&self, cust_no: u16) -> Option<usize> {
+        self.stops.iter().position(|a| {a.cust_no == cust_no})
+    }
+
     pub fn add_stop_to_index(&mut self, stop: Stop, index: usize) {
         self.assert_sanity();
         assert!(index <= self.stops.len()); // should be less than stops.len()
@@ -169,7 +183,7 @@ impl Route {
         self.assert_sanity();
     }
 
-    pub fn remove_stop(&mut self, index: usize) -> Stop {
+    pub fn remove_stop_at_index(&mut self, index: usize) -> Stop {
         self.assert_sanity();
         assert!(index <= self.stops.len()); // should be less than stops.len()
 
