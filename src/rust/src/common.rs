@@ -1,6 +1,6 @@
 use std::{cmp::{max, min}, collections::{HashMap, HashSet}, sync::Arc};
 
-use crate::vrp_instance::VRPInstance;
+use crate::vrp_instance::{self, VRPInstance};
 
 pub struct DistanceMatrix(Vec<Vec<f64>>);
 
@@ -51,7 +51,7 @@ pub struct VRPSolution {
 impl std::fmt::Debug for VRPSolution {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for r in self.routes.iter() {
-            f.write_fmt(format_args!("{:?}\n", r)).unwrap()
+            f.write_fmt(format_args!("{:?}, capacity: {}\n", r, r.used_capacity())).unwrap();
         }
         Ok(())
     }
@@ -129,12 +129,14 @@ impl VRPSolution {
         let map_a = a.make_vector(instance);
         let map_b = b.make_vector(instance);
         assert!(map_a.len() == map_b.len());
-        assert!(map_b.len() == instance.num_customers * (instance.num_customers - 1));
+        assert!(map_b.len() == (instance.num_customers - 1) * (instance.num_customers - 2) / 2);
 
-        for ((_, count_a), (_, count_b)) in map_a.into_iter().zip(map_b.into_iter()) {
-            dist += (count_a - count_b).pow(2);
+        for i in 1..instance.num_customers {
+            for j in (i + 1)..instance.num_customers {
+                let key = &(i.try_into().unwrap(), j.try_into().unwrap());
+                dist += map_a.get(key).unwrap() ^ map_b.get(key).unwrap();
+            }
         }
-
         (dist as f64).sqrt()
     }
 
@@ -146,12 +148,9 @@ impl VRPSolution {
                 for other_cust in (el.cust_no + 1)..instance.num_customers.try_into().unwrap() {
                     let entry = (el.cust_no, other_cust);
                     assert_eq!(entry, (min(el.cust_no, other_cust), max(el.cust_no, other_cust)));
-                    
-                    let val = match r.stops.iter().filter(|s| s.cust_no == other_cust).count() {
-                        count if count <= 1 => count,
-                        wacky => panic!("wacky count {wacky} of cust no {other_cust:?} in {r:?}"),
-                    };
-
+                    let val = if r.contains_stop(other_cust) {
+                        1
+                    } else { 0 };
                     let insert_res = map.insert(entry, val);
                     assert!(insert_res.is_none());
                 }
