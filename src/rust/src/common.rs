@@ -191,6 +191,14 @@ impl Route {
 
     pub fn stops(&self) -> &Vec<Stop> { &self.stops }
 
+    pub fn first(&self) -> usize {
+        return self.stops.first().unwrap().cust_no().try_into().unwrap();
+    }
+
+    pub fn last(&self) -> usize {
+        return self.stops.last().unwrap().cust_no().try_into().unwrap();
+    }
+
     pub fn cost(&self) -> f64 {
         self.assert_sanity(); // TODO: remove for debug
         self.cost
