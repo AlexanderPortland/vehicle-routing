@@ -1,4 +1,7 @@
-use std::{sync::Arc, time::{Duration, Instant}};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use rand::Rng;
 use stats::SolveStats;
@@ -72,10 +75,10 @@ pub mod stats {
         pub route_remove_freq: HashMap<usize, usize>,
         pub route_add_freq: HashMap<usize, usize>,
     }
-    
+
     impl SolveStats {
         pub fn new() -> Self {
-            SolveStats { 
+            SolveStats {
                 iterations: 0,
                 improvements: Vec::new(),
                 restarts: Vec::new(),
@@ -85,7 +88,12 @@ pub mod stats {
             }
         }
 
-        pub fn update_on_iter(&mut self, iter: usize, new_sol: &VRPSolution, improvement_on_best: f64) {
+        pub fn update_on_iter(
+            &mut self,
+            iter: usize,
+            new_sol: &VRPSolution,
+            improvement_on_best: f64,
+        ) {
             if improvement_on_best > 0.01 {
                 self.improvements.push((iter, new_sol.cost()));
             }
@@ -97,7 +105,6 @@ pub mod stats {
         }
     }
 }
-
 
 // Commenting out for now b/c stats is used in neighbors.rs — Julian
 // #[cfg(not(debug_assertions))]
@@ -117,7 +124,6 @@ pub mod stats {
 //         pub fn on_restart(&mut self, iter: usize) {}
 //     }
 // }
-
 
 type SolveResult = (VRPSolution, SolveStats);
 
@@ -139,28 +145,29 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
         TermCond::MaxIters(max) => Box::new(0..max),
         TermCond::TimeElapsed(_) => Box::new(0..),
     };
-    let mut patience = params.patience as f64;
 
     let start = Instant::now();
     for iter in &mut iters {
         if let TermCond::TimeElapsed(max_time) = params.terminate {
-            if start.elapsed() > max_time { break; }
+            if start.elapsed() > max_time {
+                break;
+            }
         }
         let (old_solution, new_solution) = solver.find_new_solution();
         let new_solution = match new_solution {
-            Some(sol) => {
-                sol
-            },
-            None =>  {
+            Some(sol) => sol,
+            None => {
                 dbg_println!("failed to produce feasible new solution; reverting to old solution");
                 solver.jump_to_solution(old_solution);
-                continue   
+                continue;
             }
         };
 
         let new_cost = new_solution.cost();
-        solver.get_stats_mut().update_on_iter(iter, &new_solution, best_cost - new_cost);
-        
+        solver
+            .get_stats_mut()
+            .update_on_iter(iter, &new_solution, best_cost - new_cost);
+
         if new_cost + 0.1 < best_cost_for_jump {
             (best_cost_for_jump, best_for_jump) = (new_cost, new_solution.clone());
         }
@@ -171,7 +178,7 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
         } else {
             iterations_since_prev_new_best += 1;
         }
-        
+
         // TODO: also seems like its worth doing 2-opt... how would i do that/
         // TODO: restart from prev best + perturb; restart when new best hasn't been improved in x trials
         // TODO: also for multithreading could init from different algos for diff threads?
@@ -193,21 +200,24 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
                 solver.jump_to_solution(old_solution);
             }
         }
-        if iter % 10000 == 0 {dbg_println!("iter {:?} has cost {:?}", iter, solver.cost());}
+        if iter % 10000 == 0 {
+            dbg_println!("iter {:?} has cost {:?}", iter, solver.cost());
+        }
 
         last_cost = new_cost;
 
-        if stagnant_iterations as f64 > patience {
-            patience = (instance.num_customers as f64 / 10f64).max(0.99f64 * patience);
-            dbg_println!("Restarting with patience {}...", patience);
+        if stagnant_iterations as f64 > params.patience as f64 {
+            dbg_println!("Restarting with patience {}...", params.patience);
             stagnant_iterations = 0;
-            let new_sol = if rng.random_bool(0.1) { 
+
+            let new_sol = if rng.random_bool(0.2) {
                 dbg_println!("Jumping from current jump best...");
                 (params.jumper)(&instance, best_for_jump.clone(), params.frac_dropped)
             } else {
                 dbg_println!("Jumping from globally found best...");
                 (params.jumper)(&instance, best.clone(), params.frac_dropped)
             };
+
             solver.get_stats_mut().on_restart(iter);
             best_cost_for_jump = new_sol.cost();
             best_for_jump = new_sol.clone();
@@ -226,7 +236,10 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
     best
 }
 
-impl<T> IterativeSolver for T where T: LNSSolver {
+impl<T> IterativeSolver for T
+where
+    T: LNSSolver,
+{
     fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self {
         Self::new(instance, initial_solution)
     }
@@ -241,11 +254,11 @@ impl<T> IterativeSolver for T where T: LNSSolver {
         self.update_tabu(&destroy_res);
         let new_sol: Option<VRPSolution> = match self.repair(destroy_res) {
             Ok(sol) => Some(sol),
-            Err(_) => None
+            Err(_) => None,
         };
         (current_sol, new_sol)
     }
-    
+
     fn jump_to_solution(&mut self, sol: VRPSolution) {
         self.jump_to_solution(sol);
     }
