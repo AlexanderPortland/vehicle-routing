@@ -15,6 +15,7 @@ use crate::vrp_instance::VRPInstance;
 pub struct MultiLNSSolver {
     instance: Arc<VRPInstance>,
     stop_tabu: VecDeque<usize>,
+    stop_not_tabu: Vec<usize>,
     current: VRPSolution,
     stats: SolveStats,
     rng: ThreadRng,
@@ -25,9 +26,11 @@ impl LNSSolver for MultiLNSSolver {
     type DestroyResult = Vec<(Stop, usize)>;
 
     fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self {
+        // println!("num customers is {:?}", instance.num_customers);
         MultiLNSSolver {
             stop_tabu: VecDeque::new(),
             current: initial_solution,
+            stop_not_tabu: (1..instance.num_customers).collect(),
             instance,
             stats: SolveStats::new(),
             rng: rand::rng()
@@ -72,16 +75,23 @@ impl LNSSolver for MultiLNSSolver {
 
     fn jump_to_solution(&mut self, sol: VRPSolution) {
         self.current = sol;
+        // for s in self.
+        self.stop_not_tabu = (1..self.instance.num_customers).collect();
         self.stop_tabu.clear();
     }
 
     fn update_tabu(&mut self, res: &Self::DestroyResult) {
         for (stop, _) in res {
-            self.stop_tabu.push_back(stop.cust_no().try_into().unwrap());
+            let cust_no = stop.cust_no().try_into().unwrap();
+            self.stop_tabu.push_back(cust_no);
+            // self.valid_remove_cust_nos.swap_remove(self.valid_remove_cust_nos.index);
         }
         
         while self.stop_tabu.len() > (self.instance.num_customers / 10) {
-            self.stop_tabu.pop_front();
+            let allowed = self.stop_tabu.pop_front();
+            if let Some(allowed) = allowed {
+                self.stop_not_tabu.push(allowed);
+            }
         }
     }
 }
@@ -89,13 +99,23 @@ impl LNSSolver for MultiLNSSolver {
 impl MultiLNSSolver {
     fn remove_n_random_stops(&mut self, n: usize) -> Vec<(Stop, usize)> {
         assert!(n > 0);
+        self.assert_tabu_sanity();
 
         let tabu = &self.stop_tabu;
         let sol = &mut self.current;
 
-        let mut customer_nos: Vec<usize> = (1..self.instance.num_customers).filter(|x| !tabu.contains(x)).collect();
-        customer_nos.shuffle(&mut self.rng);
-        customer_nos.truncate(n);
+        // TODO: keep Vec metadata of valid customer ids to remove (so we dont have to filter)
+        //              * update on tabu change
+        //       remove from random index of it w/ .swap_remove() for quick removal
+        let mut customer_nos = Vec::new();
+        for _ in 0..n {
+            let rem_index = self.rng.random_range(0..self.stop_not_tabu.len());
+            customer_nos.push(self.stop_not_tabu.swap_remove(rem_index));
+        }
+        assert!(customer_nos.len() == n);
+        // let mut customer_nos: Vec<usize> = (1..self.instance.num_customers).filter(|x| !tabu.contains(x)).collect();
+        // customer_nos.shuffle(&mut self.rng);
+        // customer_nos.truncate(n);
 
         let mut res = Vec::new();
 
@@ -111,6 +131,20 @@ impl MultiLNSSolver {
         }
         res
     }
+
+    #[cfg(debug_assertions)]
+    fn assert_tabu_sanity(&self) {
+        let full_tabu = self.stop_tabu.iter().chain(self.stop_not_tabu.iter()).collect::<Vec<_>>();
+
+        // println!("stop tabu is {:?}, non tabu is {:?}", self.stop_tabu, self.stop_not_tabu);
+        // println!("len is {:?}, num cust is {:?}", full_tabu.len(), self.instance.num_customers - 1);
+        assert!(full_tabu.len() == (self.instance.num_customers - 1));
+        for cust_no in 1..self.instance.num_customers {
+            assert!(full_tabu.contains(&&cust_no));
+        }
+    }
+    #[cfg(not(debug_assertions))]
+    fn assert_tabu_sanity(&self) { }
 
     fn reinsert_n_stops_in_best_spots(&mut self, removed_stops: Vec<(Stop, usize)>) -> Result<Vec<usize>, String> {
         let mut res = Vec::new();
