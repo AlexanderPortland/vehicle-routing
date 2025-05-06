@@ -24,7 +24,7 @@ pub mod single_swap {
 
     use rand::seq::SliceRandom;
 
-    use crate::{common::VRPSolution, vrp_instance::{self, VRPInstance}};
+    use crate::{common::VRPSolution, dbg_println, vrp_instance::{self, VRPInstance}};
 
     use super::SwapResult;
     use rand::rng;
@@ -66,13 +66,13 @@ pub mod single_swap {
 
                         if (new_cost < initial_cost) {
                             if (initial_cost - new_cost).abs() < 0.01 { continue; }
-                            println!("VALID, GOOD SWAP FOUND!!");
-                            println!("swapping {:?} from {:?} to {:?} from {:?}", a, a_route, b, b_route);
-                            println!("new cost {:?} (vs {:?})", new_cost, initial_cost);
+                            dbg_println!("VALID, GOOD SWAP FOUND!!");
+                            dbg_println!("swapping {:?} from {:?} to {:?} from {:?}", a, a_route, b, b_route);
+                            dbg_println!("new cost {:?} (vs {:?})", new_cost, initial_cost);
                             // println!("under caps are {:?}", (a_under_cap, b_under_cap));
                             // good_swaps += 1;
                             let improvement = initial_cost - new_cost;
-                            println!("in {:?}", start.elapsed());
+                            dbg_println!("in {:?}", start.elapsed());
 
                             swap = Some(SwapResult { a_route_i, a_i, a_stop: *a, b_route_i, b_i, b_stop: *b });
 
@@ -91,7 +91,7 @@ pub mod single_swap {
         // todo!();
 
         if let Some(SwapResult { a_route_i, a_i, a_stop: _, b_route_i, b_i, b_stop: _ }) = swap {
-            println!("found swap");
+            dbg_println!("found swap");
             let a = sol.routes[a_route_i].remove_stop_at_index(a_i);
             let b = sol.routes[b_route_i].remove_stop_at_index(b_i);
 
@@ -99,13 +99,13 @@ pub mod single_swap {
             sol.routes[b_route_i].add_stop_to_index(a, b_i);
 
 
-            println!("have new sol {:?} in {:?}", sol, start.elapsed());
+            dbg_println!("have new sol {:?} in {:?}", sol, start.elapsed());
             // todo!()
 
             // TODO: do swap here
-            println!("yes swappies found :D");
+            dbg_println!("yes swappies found :D");
         } else {
-            println!("no swappies found :(");
+            dbg_println!("no swappies found :(");
             return (sol, None);
             // panic!();
         }

@@ -2,6 +2,20 @@ use std::{cmp::{max, min}, collections::{HashMap, HashSet}, sync::Arc};
 
 use crate::vrp_instance::{self, VRPInstance};
 
+// const DEBUG_PRINTS: bool = true;
+
+#[macro_export]
+macro_rules! dbg_println {
+    ($($arg:tt)*) => (if false { println!($($arg)*); });
+}
+// macro_rules! dbg_println {
+//     ($($inner: tt,)*) => {
+//         if DEBUG_PRINTS {
+//             println!($($inner: block,)*);
+//         }
+//     };
+// }
+
 pub struct DistanceMatrix(Vec<Vec<f64>>);
 
 impl DistanceMatrix {
@@ -179,10 +193,21 @@ impl std::fmt::Debug for Route {
 }
 
 impl Route {
+    pub fn retain_stops(&mut self, f: impl Fn(&Stop) -> bool) {
+        self.assert_sanity();
+
+        self.stops.retain(f);
+
+        self.cost = self.recalculate_cost();
+        self.used_cap = self.recalculate_capacity();
+
+        self.assert_sanity();
+    }
+
     pub fn to_string(&self) -> String {
         let middle = self.stops.iter().map(|i| format!("{:?}", i)).collect::<Vec<String>>();
         let middle = middle.join(" -> ");
-        format!("r{}[{middle}]", self.id)
+        format!("r{}[{middle}--c{}]", self.id, self.used_cap)
     }
     pub fn new(instance: Arc<VRPInstance>, id: usize) -> Self {
         Route { stops: Vec::with_capacity(instance.num_customers), instance, cost: 0f64, used_cap: 0, id }
@@ -392,6 +417,10 @@ impl Route {
     }
     
     fn check_route_cost(&self) {
+        assert!((self.recalculate_cost() - self.cost).abs() < 0.5f64);
+    }
+
+    fn recalculate_cost(&self) -> f64 {
         let mut cost = 0f64;
 
         for i in 1..self.stops.len() {
@@ -402,17 +431,15 @@ impl Route {
             cost += self.instance.distance_matrix.dist(0, self.stops[0].cust_no);
             cost += self.instance.distance_matrix.dist(self.stops[self.stops.len() - 1].cust_no, 0);
         }
-
-        // println!("got cost {:?} for {:?} (vs {:?})", cost, self, self.cost);
-
-        assert!((cost - self.cost).abs() < 0.5f64);
+        cost
     }
 
     fn check_capacity(&self) {
-        let real_cap: usize = self.stops.iter().map(|s|{
-            s.capacity
-        }).sum();
-        assert!(real_cap == self.used_cap);
+        assert!(self.recalculate_capacity() == self.used_cap);
+    }
+
+    fn recalculate_capacity(&self) -> usize {
+        self.stops.iter().map(|s|{ s.capacity }).sum()
     }
 
     fn check_no_duplicate_stops(&self) {

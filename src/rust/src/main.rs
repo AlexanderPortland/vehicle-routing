@@ -2,11 +2,13 @@ mod common;
 mod vrp_instance;
 mod solver;
 mod construct;
-mod explode;
+mod swap;
+mod jump;
 pub mod solvers;
 
+use std::time::Duration;
 use std::{env, sync::Arc, time::Instant};
-use solver::SolveParams;
+use solver::{SolveParams, TermCond};
 use vrp_instance::VRPInstance;
 
 use serde_json::{json, to_string_pretty};
@@ -35,14 +37,17 @@ fn main() {
 
     let start = Instant::now();
     let vrp_instance = VRPInstance::new(file_path);
-    let patience = vrp_instance.num_customers / 3;
+    let frac_patience = 0.7;
+    let patience = (vrp_instance.num_customers as f64 * frac_patience) as usize;
 
     let sol = solver::solve::<solvers::MultiLNSSolver>(
         Arc::new(vrp_instance), 
         SolveParams {
-            max_iters: 10000,
-            patience: patience,
+            // terminate: TermCond::MaxIters(50000),
+            terminate: TermCond::TimeElapsed(Duration::from_secs(30 * 1)),
+            patience,
             constructor: construct::sweep,
+            jumper: jump::random_drop,
         }
     );
     let duration = start.elapsed();

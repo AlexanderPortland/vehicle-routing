@@ -1,15 +1,23 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::{Duration, Instant}};
 
 use rand::Rng;
 use stats::SolveStats;
 
-use crate::{common::VRPSolution, explode, vrp_instance::VRPInstance};
+use crate::{common::VRPSolution, dbg_println, swap, vrp_instance::VRPInstance};
+
+pub enum TermCond {
+    MaxIters(usize),
+    TimeElapsed(Duration),
+}
 
 pub struct SolveParams {
-    pub max_iters: usize,
+    pub terminate: TermCond,
     /// jump after this many stagnant iterations
     pub patience: usize,
+    // should be set of constructors to use one after the other...
     pub constructor: fn(&Arc<VRPInstance>) -> VRPSolution,
+    // could also be a set of jumpers to use randomly between them
+    pub jumper: fn(&Arc<VRPInstance>, VRPSolution) -> VRPSolution,
 }
 
 // trait for a large neighborhood search (LNS) solver
@@ -123,16 +131,24 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
     let mut last_cost = best.cost();
     let mut rng = rand::rng();
 
-    for iter in 0..params.max_iters {
+    let iters: Box<dyn Iterator<Item = usize>> = match params.terminate {
+        TermCond::MaxIters(max) => Box::new(0..max),
+        TermCond::TimeElapsed(_) => Box::new(0..),
+    };
+
+    let start = Instant::now();
+
+    for iter in iters {
+        if let TermCond::TimeElapsed(max_time) = params.terminate {
+            if start.elapsed() > max_time { break; }
+        }
         let (old_solution, new_solution) = solver.find_new_solution();
         let new_solution = match new_solution {
             Some(sol) => {
-                // println!("have old solution {:?} and new solution {:?}", old_solution, sol);
-                // println!("distance between them is {:?}", VRPSolution::distance(&old_solution, &sol, &instance));
                 sol
             },
             None =>  {
-                println!("failed to produce feasible new solution; reverting to old solution");
+                dbg_println!("failed to produce feasible new solution; reverting to old solution");
                 solver.jump_to_solution(old_solution);
                 continue   
             }
@@ -144,7 +160,7 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
         solver.get_stats_mut().update_on_iter(iter, &new_solution, best_cost - new_cost);
         
         if new_cost < best_cost {
-            println!("new_best: {}", best_cost);
+            dbg_println!("new_best: {}", best_cost);
             (best_cost, best) = (new_solution.cost(), new_solution);
         }
         // TODO: also seems like its worth doing 2-opt... how would i do that/
@@ -153,11 +169,13 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
         // TODO: => intiiate n swaps for perturb and make sure that they are real swaps you know?
         if new_cost + 0.1 < last_cost {
             // improvement
+            dbg_println!("IMPROVED {:?} <- {:?}", new_cost, last_cost);
             stagnant_iterations = 0;
             // solver already has new_solution set as current
         } else {
             // no improvement
             stagnant_iterations += 1;
+            dbg_println!("STAGNANT {:?} <- {:?}", new_cost, last_cost);
 
             // simmulated annealing — with 0.1 probability, do not revert to the old solution (i.e. accept the new, worse solution)
             if rng.random_bool(0.9) {
@@ -165,19 +183,19 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
                 solver.jump_to_solution(old_solution);
             }
         }
-        if iter % 100 == 0 {println!("iter {:?} has cost {:?}", iter, solver.cost());}
+        if iter % 100 == 0 {dbg_println!("iter {:?} has cost {:?}", iter, solver.cost());}
 
         last_cost = new_cost;
 
         if stagnant_iterations > params.patience {
-            println!("Restarting...");
+            dbg_println!("Restarting...");
             stagnant_iterations = 0;
-            solver.jump_to_solution((params.constructor)(&instance));
+            solver.jump_to_solution((params.jumper)(&instance, best.clone()));
             solver.get_stats_mut().on_restart(iter);
         }
     }
 
-    println!("Stats: {:?}", solver.get_stats_mut());
+    dbg_println!("Stats: {:?}", solver.get_stats_mut());
     best
 }
 

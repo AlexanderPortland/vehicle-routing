@@ -4,7 +4,7 @@ use std::{
 
 use rand::{rng, rngs::ThreadRng, seq::SliceRandom, Rng};
 
-use crate::common::{Route, Stop, VRPSolution};
+use crate::{common::{Route, Stop, VRPSolution}, dbg_println};
 use crate::construct;
 use crate::solver::stats::SolveStats;
 use crate::solver::{IterativeSolver, LNSSolver};
@@ -52,7 +52,7 @@ impl LNSSolver for MultiLNSSolver {
                 .or_insert(0) += 1;
             *self.stats.route_remove_freq.entry(*route_idx).or_insert(0) += 1;
         }
-        println!("Removing: {:?}", removed_stops);
+        dbg_println!("Removing: {:?}", removed_stops);
         return removed_stops;
     }
 
@@ -153,7 +153,7 @@ impl MultiLNSSolver {
             let i = rng().random_range(0..valid.len());
             (best_spot_r, best_spot_i) = *valid.get(i).unwrap();
         }
-        println!("Reinserting: {:?} at {}", stop, best_spot_r);
+        dbg_println!("Reinserting: {:?} at {}", stop, best_spot_r);
         self.current.routes[best_spot_r].add_stop_to_index(stop, best_spot_i);
 
         // println!("Solution after inserting {:?}: {:?}", stop, self.current);

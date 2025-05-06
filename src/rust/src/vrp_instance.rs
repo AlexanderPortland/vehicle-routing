@@ -4,6 +4,7 @@ use std::path::Path;
 use std::process;
 
 use crate::common::DistanceMatrix;
+use crate::dbg_println;
 
 pub struct VRPInstance {
     pub num_customers: usize,
@@ -93,7 +94,7 @@ impl VRPInstance {
 
         // Print customer data
         for i in 0..num_customers {
-            println!("{} {} {}", demand_of_customer[i], x_coord_of_customer[i], y_coord_of_customer[i]);
+            dbg_println!("{} {} {}", demand_of_customer[i], x_coord_of_customer[i], y_coord_of_customer[i]);
         }
 
         // calculate distance matrix
@@ -115,8 +116,8 @@ impl VRPInstance {
     }
 
     pub fn to_string(&self) {
-        println!("Number of customers: {}", self.num_customers);
-        println!("Number of vehicles: {}", self.num_vehicles);
-        println!("Vehicle capacity: {}", self.vehicle_capacity);
+        dbg_println!("Number of customers: {}", self.num_customers);
+        dbg_println!("Number of vehicles: {}", self.num_vehicles);
+        dbg_println!("Vehicle capacity: {}", self.vehicle_capacity);
     }
 }

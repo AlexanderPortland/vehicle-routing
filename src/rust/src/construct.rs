@@ -4,6 +4,7 @@ use rand::seq::SliceRandom;
 use rand::{rng, Rng, SeedableRng};
 
 use crate::common::Route;
+use crate::dbg_println;
 use crate::{common::Stop, common::VRPSolution, vrp_instance::VRPInstance};
 use std::cmp::Reverse;
 use rand::rngs::StdRng;
@@ -158,7 +159,7 @@ pub fn clarke_wright(vrp: &Arc<VRPInstance>) -> VRPSolution {
         // check for the "tail-to-head" merge: route_i.last == i, route_j.first == j
         let (last_i, first_j) = (routes[ri].last(), routes[rj].first());
         if last_i == i && first_j == j {
-            println!("merging");
+            dbg_println!("merging");
             let cap_i = routes[ri].used_capacity();
             let cap_j = routes[rj].used_capacity();
             if cap_i + cap_j <= vrp.vehicle_capacity {
@@ -176,7 +177,7 @@ pub fn clarke_wright(vrp: &Arc<VRPInstance>) -> VRPSolution {
             
             let (last_j, first_i) = (routes[rj].last(), routes[ri].first());
             if last_j == j && first_i == i {
-                println!("merging");
+                dbg_println!("merging");
                 let cap_i = routes[ri].used_capacity();
                 let cap_j = routes[rj].used_capacity();
                 if cap_i + cap_j <= vrp.vehicle_capacity {
@@ -192,7 +193,7 @@ pub fn clarke_wright(vrp: &Arc<VRPInstance>) -> VRPSolution {
         }
     }
     for r in routes.iter() {
-        println!("{:?}", r);
+        dbg_println!("{:?}", r);
     }
 
     let mut sol = VRPSolution::new(vrp.clone());
