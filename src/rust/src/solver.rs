@@ -127,12 +127,12 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
         let (old_solution, new_solution) = solver.find_new_solution();
         let new_solution = match new_solution {
             Some(sol) => {
-                println!("have old solution {:?} and new solution {:?}", old_solution, sol);
-                println!("distance between them is {:?}", VRPSolution::distance(&old_solution, &sol, &instance));
+                // println!("have old solution {:?} and new solution {:?}", old_solution, sol);
+                // println!("distance between them is {:?}", VRPSolution::distance(&old_solution, &sol, &instance));
                 sol
             },
             None =>  {
-                println!("failed to produce feasible new solution; reverting to old solution");
+                // println!("failed to produce feasible new solution; reverting to old solution");
                 solver.jump_to_solution(old_solution);
                 continue   
             }

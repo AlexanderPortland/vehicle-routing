@@ -42,7 +42,7 @@ impl LNSSolver for MultiLNSSolver {
         // TODO: tune the number of stops to remove / have it be variable??
         // println!("Cost: {}", self.current.cost());
         // println!("Solution before destroying: {:?}", self.current);
-        let removed_stops = self.remove_n_random_stops(5);
+        let removed_stops = self.remove_n_random_stops(1);
 
         for (stop, route_idx) in removed_stops.iter() {
             *self
@@ -52,7 +52,7 @@ impl LNSSolver for MultiLNSSolver {
                 .or_insert(0) += 1;
             *self.stats.route_remove_freq.entry(*route_idx).or_insert(0) += 1;
         }
-        println!("Removing: {:?}", removed_stops);
+        // println!("Removing: {:?}", removed_stops);
         return removed_stops;
     }
 
@@ -72,9 +72,7 @@ impl LNSSolver for MultiLNSSolver {
 
     fn jump_to_solution(&mut self, sol: VRPSolution) {
         self.current = sol;
-
-        // ! UNDO THIS LATER
-        // self.tabu.clear();
+        self.stop_tabu.clear();
     }
 
     fn update_tabu(&mut self, res: &Self::DestroyResult) {
@@ -153,7 +151,7 @@ impl MultiLNSSolver {
             let i = rng().random_range(0..valid.len());
             (best_spot_r, best_spot_i) = *valid.get(i).unwrap();
         }
-        println!("Reinserting: {:?} at {}", stop, best_spot_r);
+        // println!("Reinserting: {:?} at {}", stop, best_spot_r);
         self.current.routes[best_spot_r].add_stop_to_index(stop, best_spot_i);
 
         // println!("Solution after inserting {:?}: {:?}", stop, self.current);

@@ -51,7 +51,7 @@ pub struct VRPSolution {
 impl std::fmt::Debug for VRPSolution {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for r in self.routes.iter() {
-            f.write_fmt(format_args!("{:?}, capacity: {}\n", r, r.used_capacity())).unwrap();
+            f.write_fmt(format_args!("{:?}\n", r)).unwrap();
         }
         Ok(())
     }
@@ -174,7 +174,7 @@ pub struct Route {
 
 impl std::fmt::Debug for Route {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{}", self.to_string()))
+        f.write_fmt(format_args!("{}, cap: {}", self.to_string(), self.used_capacity()))
     }
 }
 

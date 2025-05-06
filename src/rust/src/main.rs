@@ -39,10 +39,10 @@ fn main() {
 
     let sol = solver::solve::<solvers::MultiLNSSolver>(
         Arc::new(vrp_instance), 
-        SolveParams {
-            max_iters: 0,
+    SolveParams {
+            max_iters: 40000,
             patience: patience,
-            constructor: construct::clarke_wright,
+            constructor: construct::clarke_wright_and_then_sweep,
         }
     );
     let duration = start.elapsed();
@@ -64,3 +64,4 @@ fn main() {
     // Write the string to the file
     file.write_all(sol.to_file_string().as_bytes()).unwrap();
 }
+
