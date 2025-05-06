@@ -17,7 +17,7 @@ pub struct SolveParams {
     // should be set of constructors to use one after the other...
     pub constructor: fn(&Arc<VRPInstance>) -> VRPSolution,
     // could also be a set of jumpers to use randomly between them
-    pub jumper: fn(&Arc<VRPInstance>, VRPSolution) -> VRPSolution,
+    pub jumper: fn(&Arc<VRPInstance>, VRPSolution, f64) -> VRPSolution,
 }
 
 // trait for a large neighborhood search (LNS) solver
@@ -126,10 +126,15 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
     let mut solver = S::new(instance.clone(), initial_solution.clone());
 
     let mut best = initial_solution; // TODO: stop cloning these
+    let mut best_for_jump = best.clone();
     let mut best_cost = best.cost();
+    let mut best_cost_for_jump = best.cost();
     let mut stagnant_iterations = 0;
+    let mut iterations_since_prev_new_best = 0;
     let mut last_cost = best.cost();
     let mut rng = rand::rng();
+    let mut frac_dropped= 0.05;
+    let mut patience = (instance.num_customers as f64 * frac_dropped).ceil() as usize;
 
     let iters: Box<dyn Iterator<Item = usize>> = match params.terminate {
         TermCond::MaxIters(max) => Box::new(0..max),
@@ -137,8 +142,9 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
     };
 
     let start = Instant::now();
-
+    let mut total_iters = 0;
     for iter in iters {
+        total_iters += 1;
         if let TermCond::TimeElapsed(max_time) = params.terminate {
             if start.elapsed() > max_time { break; }
         }
@@ -153,29 +159,35 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
                 continue   
             }
         };
-        
-
 
         let new_cost = new_solution.cost();
         solver.get_stats_mut().update_on_iter(iter, &new_solution, best_cost - new_cost);
         
-        if new_cost < best_cost {
-            dbg_println!("new_best: {}", best_cost);
-            (best_cost, best) = (new_solution.cost(), new_solution);
+        if new_cost + 0.1 < best_cost_for_jump {
+            (best_cost_for_jump, best_for_jump) = (new_cost, new_solution.clone());
         }
+        if new_cost + 0.1 < best_cost {
+            (best_cost, best) = (new_cost, new_solution);
+            iterations_since_prev_new_best = 0;
+            dbg_println!("new_best: {}", best_cost);
+        } else {
+            iterations_since_prev_new_best += 1;
+        }
+        
         // TODO: also seems like its worth doing 2-opt... how would i do that/
         // TODO: restart from prev best + perturb; restart when new best hasn't been improved in x trials
         // TODO: also for multithreading could init from different algos for diff threads?
         // TODO: => intiiate n swaps for perturb and make sure that they are real swaps you know?
+
         if new_cost + 0.1 < last_cost {
             // improvement
-            dbg_println!("IMPROVED {:?} <- {:?}", new_cost, last_cost);
+            // dbg_println!("IMPROVED {:?} <- {:?}", new_cost, last_cost);
             stagnant_iterations = 0;
             // solver already has new_solution set as current
         } else {
             // no improvement
             stagnant_iterations += 1;
-            dbg_println!("STAGNANT {:?} <- {:?}", new_cost, last_cost);
+            // dbg_println!("STAGNANT {:?} <- {:?}", new_cost, last_cost);
 
             // simmulated annealing — with 0.1 probability, do not revert to the old solution (i.e. accept the new, worse solution)
             if rng.random_bool(0.9) {
@@ -187,11 +199,22 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
 
         last_cost = new_cost;
 
-        if stagnant_iterations > params.patience {
+        if stagnant_iterations > patience {
             dbg_println!("Restarting...");
             stagnant_iterations = 0;
-            solver.jump_to_solution((params.jumper)(&instance, best.clone()));
+            frac_dropped = (0.2f64).min(0.01 + (iterations_since_prev_new_best as f64 / total_iters as f64));
+            patience = (instance.num_customers as f64 * frac_dropped).ceil() as usize;
+            let new_sol = if rng.random_bool(0.5) { 
+                dbg_println!("Jumping from current jump best...");
+                (params.jumper)(&instance, best_for_jump.clone(), frac_dropped)
+            } else {
+                dbg_println!("Jumping from globally found best...");
+                (params.jumper)(&instance, best.clone(), frac_dropped)
+            };
             solver.get_stats_mut().on_restart(iter);
+            best_cost_for_jump = new_sol.cost();
+            best_for_jump = new_sol.clone();
+            solver.jump_to_solution(new_sol);
         }
     }
 

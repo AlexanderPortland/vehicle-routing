@@ -6,8 +6,9 @@ use crate::vrp_instance::{self, VRPInstance};
 
 #[macro_export]
 macro_rules! dbg_println {
-    ($($arg:tt)*) => (if false { println!($($arg)*); });
+    ($($arg:tt)*) => (if true { println!($($arg)*); });
 }
+
 // macro_rules! dbg_println {
 //     ($($inner: tt,)*) => {
 //         if DEBUG_PRINTS {

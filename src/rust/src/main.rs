@@ -37,21 +37,20 @@ fn main() {
 
     let start = Instant::now();
     let vrp_instance = VRPInstance::new(file_path);
-    let frac_patience = 0.7;
+    let frac_patience = 0.05;
     let patience = (vrp_instance.num_customers as f64 * frac_patience) as usize;
 
     let sol = solver::solve::<solvers::MultiLNSSolver>(
         Arc::new(vrp_instance), 
         SolveParams {
-            // terminate: TermCond::MaxIters(50000),
-            terminate: TermCond::TimeElapsed(Duration::from_secs(30 * 1)),
+            terminate: TermCond::MaxIters(40000),
+            // terminate: TermCond::TimeElapsed(Duration::from_secs(60 * 1)),
             patience,
-            constructor: construct::sweep,
+            constructor: construct::clarke_wright_and_then_sweep,
             jumper: jump::random_drop,
         }
     );
     let duration = start.elapsed();
-
 
     let output = json!({
         "Instance": file_name,

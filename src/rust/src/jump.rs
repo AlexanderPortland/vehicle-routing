@@ -8,10 +8,9 @@ use crate::{common::{Stop, VRPSolution}, dbg_println, vrp_instance::{self, VRPIn
 
 // type Jumper = fn(&Arc<VRPInstance>, VRPSolution) -> VRPSolution;
 
-pub fn random_drop(vrp_instance: &Arc<VRPInstance>, mut existing: VRPSolution) -> VRPSolution {
+pub fn random_drop(vrp_instance: &Arc<VRPInstance>, mut existing: VRPSolution, frac_dropped: f64) -> VRPSolution {
     // println!("existing solution (max cap {:?}) is {:?}", vrp_instance.vehicle_capacity, existing);
 
-    let frac_dropped: f64 = 0.6;
     dbg_println!("JUMPING (*random drop technique* dropping {:?}%)", frac_dropped * 100f64);
     // println!("--have existing {:?} w/ cost {:?} now", existing, existing.cost());
     let rng = &mut rand::rng();
@@ -35,6 +34,7 @@ pub fn random_drop(vrp_instance: &Arc<VRPInstance>, mut existing: VRPSolution) -
         Stop::new(*cust_no, vrp_instance.demand_of_customer[*cust_no as usize])
     }).collect::<Vec<_>>();
     to_add.sort_by_key(|t| std::cmp::Reverse(t.capacity()));
+
     existing.routes.shuffle(rng);
 
     // println!("have to add back {:?}", to_add);
