@@ -406,6 +406,7 @@ impl Route {
 
     // *********** SANITY CHECKING ***********
 
+    #[cfg(debug_assertions)]
     pub fn assert_sanity(&self) {
         // println!("** trying to assert sanity on {:?}", self);
 
@@ -414,6 +415,11 @@ impl Route {
         self.check_no_duplicate_stops();
 
         // println!("** asserted sanity on {:?}", self);
+    }
+
+    #[cfg(not(debug_assertions))]
+    pub fn assert_sanity(&self) { 
+        // don't do any sanity checking in release mode
     }
     
     fn check_route_cost(&self) {

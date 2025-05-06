@@ -46,7 +46,7 @@ fn main() {
             // terminate: TermCond::MaxIters(50000),
             terminate: TermCond::TimeElapsed(Duration::from_secs(30 * 1)),
             patience,
-            constructor: construct::sweep,
+            constructor: construct::clarke_wright_and_then_sweep,
             jumper: jump::random_drop,
         }
     );

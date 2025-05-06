@@ -131,14 +131,14 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
     let mut last_cost = best.cost();
     let mut rng = rand::rng();
 
-    let iters: Box<dyn Iterator<Item = usize>> = match params.terminate {
+    let mut iters: Box<dyn Iterator<Item = usize>> = match params.terminate {
         TermCond::MaxIters(max) => Box::new(0..max),
         TermCond::TimeElapsed(_) => Box::new(0..),
     };
 
     let start = Instant::now();
 
-    for iter in iters {
+    for iter in &mut iters {
         if let TermCond::TimeElapsed(max_time) = params.terminate {
             if start.elapsed() > max_time { break; }
         }
@@ -194,6 +194,13 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
             solver.get_stats_mut().on_restart(iter);
         }
     }
+
+    let total_iters = match params.terminate {
+        TermCond::MaxIters(max) => max,
+        TermCond::TimeElapsed(_) => iters.next().unwrap() - 1,
+    };
+
+    println!("got through {:?} iters", total_iters);
 
     dbg_println!("Stats: {:?}", solver.get_stats_mut());
     best
