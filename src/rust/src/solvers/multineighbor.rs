@@ -101,7 +101,7 @@ impl MultiLNSSolver {
         assert!(n > 0);
         self.assert_tabu_sanity();
 
-        let tabu = &self.stop_tabu;
+        // let tabu = &self.stop_tabu;
         let sol = &mut self.current;
 
         // TODO: keep Vec metadata of valid customer ids to remove (so we dont have to filter)
@@ -160,7 +160,7 @@ impl MultiLNSSolver {
         let (mut best_spot_r, mut best_spot_i, mut best_spot_cost_increase) =
             (usize::MAX, usize::MAX, f64::MAX);
 
-        let mut valid = Vec::new();
+        let mut valid = Vec::with_capacity(self.instance.num_customers);
 
         for (r, route) in self.current.routes.iter().enumerate() {
             for i in 0..(route.stops().len() + 1) {
@@ -169,6 +169,9 @@ impl MultiLNSSolver {
                 // we want the one that will increase the new cost by the least, so minimize
                 let cost_increase = new_cost - route.cost();
                 if feas {
+                    if valid.len() == valid.capacity() {
+                        println!("would resizie here to get to ...");
+                    }
                     valid.push((r, i));
                 }
                 if feas && cost_increase < best_spot_cost_increase {

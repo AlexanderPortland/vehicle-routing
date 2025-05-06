@@ -14,6 +14,7 @@ pub struct VRPInstance {
     pub x_coord_of_customer: Vec<f64>,
     pub y_coord_of_customer: Vec<f64>,
     pub distance_matrix: DistanceMatrix,
+    pub max_route_len: usize,
 }
 
 impl VRPInstance {
@@ -107,6 +108,7 @@ impl VRPInstance {
         VRPInstance {
             num_customers,
             num_vehicles,
+            max_route_len: Self::max_route_len(&demand_of_customer, vehicle_capacity),
             vehicle_capacity,
             demand_of_customer,
             x_coord_of_customer,
@@ -119,5 +121,25 @@ impl VRPInstance {
         dbg_println!("Number of customers: {}", self.num_customers);
         dbg_println!("Number of vehicles: {}", self.num_vehicles);
         dbg_println!("Vehicle capacity: {}", self.vehicle_capacity);
+    }
+
+    pub fn max_route_len(demands: &Vec<usize>, capacity: usize) -> usize {
+        let mut demands = demands.clone();
+        demands.swap_remove(0);
+        // println!("demands {:?}", demands);
+        demands.sort();
+        let mut used_cap = 0;
+        let mut count = 0;
+
+        for d in demands {
+            if used_cap >= capacity { break; }
+            count += 1;
+            used_cap += d;
+            // println!("using {:?}, used_cap {:?} (of {:?}), count {:?}", d, used_cap, capacity, count);
+        }
+
+        // todo!("total count {:?}", count);
+
+        count
     }
 }

@@ -6,7 +6,7 @@ use crate::vrp_instance::{self, VRPInstance};
 
 #[macro_export]
 macro_rules! dbg_println {
-    ($($arg:tt)*) => (if true { println!($($arg)*); });
+    ($($arg:tt)*) => (if false { println!($($arg)*); });
 }
 
 // macro_rules! dbg_println {
@@ -193,6 +193,28 @@ impl std::fmt::Debug for Route {
     }
 }
 
+// impl Clone for Route {
+//     fn clone(&self) -> Self {
+//         // println!("CLONING {:?}", self);
+//         // println!("old vec is {:?} -- cap {:?}", self.stops, self.stops.capacity());
+//         let mut new_stops = Vec::with_capacity(self.stops.capacity());
+
+//         // SAFETY: the memory regions for both vectors will not overlap, and both will be valid for 
+//         //         self.stops.cap length. 
+//         unsafe {
+//             std::ptr::copy_nonoverlapping(self.stops.as_ptr(), new_stops.as_mut_ptr(), self.stops.len());
+//             new_stops.set_len(self.stops.len());
+//         }
+//         // let new_stops = self.stops.clone();
+
+//         // println!("new vec is {:?} -- cap {:?}", new_stops, new_stops.capacity());
+
+//         // todo!();
+
+//         Route { instance: self.instance.clone(), id: self.id, stops: new_stops, cost: self.cost, used_cap: self.used_cap }
+//     }
+// }
+
 impl Route {
     pub fn retain_stops(&mut self, f: impl Fn(&Stop) -> bool) {
         self.assert_sanity();
@@ -211,7 +233,7 @@ impl Route {
         format!("r{}[{middle}--c{}]", self.id, self.used_cap)
     }
     pub fn new(instance: Arc<VRPInstance>, id: usize) -> Self {
-        Route { stops: Vec::with_capacity(instance.num_customers), instance, cost: 0f64, used_cap: 0, id }
+        Route { stops: Vec::with_capacity(instance.max_route_len), instance, cost: 0f64, used_cap: 0, id }
     }
 
     pub fn stops(&self) -> &Vec<Stop> { &self.stops }
