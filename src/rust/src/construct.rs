@@ -5,6 +5,7 @@ use rand::{Rng, SeedableRng, rng};
 use rand_distr::{Distribution, Normal};
 
 use crate::common::Route;
+use crate::dbg_println;
 use crate::{common::Stop, common::VRPSolution, vrp_instance::VRPInstance};
 use rand::rngs::StdRng;
 use std::cmp::Reverse;

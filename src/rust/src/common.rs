@@ -2,6 +2,20 @@ use std::{cmp::{max, min}, collections::{HashMap, HashSet}, sync::Arc};
 
 use crate::vrp_instance::{self, VRPInstance};
 
+// const DEBUG_PRINTS: bool = true;
+
+#[macro_export]
+macro_rules! dbg_println {
+    ($($arg:tt)*) => (if false { println!($($arg)*); });
+}
+// macro_rules! dbg_println {
+//     ($($inner: tt,)*) => {
+//         if DEBUG_PRINTS {
+//             println!($($inner: block,)*);
+//         }
+//     };
+// }
+
 pub struct DistanceMatrix(Vec<Vec<f64>>);
 
 impl DistanceMatrix {
@@ -179,10 +193,21 @@ impl std::fmt::Debug for Route {
 }
 
 impl Route {
+    pub fn retain_stops(&mut self, f: impl Fn(&Stop) -> bool) {
+        self.assert_sanity();
+
+        self.stops.retain(f);
+
+        self.cost = self.recalculate_cost();
+        self.used_cap = self.recalculate_capacity();
+
+        self.assert_sanity();
+    }
+
     pub fn to_string(&self) -> String {
         let middle = self.stops.iter().map(|i| format!("{:?}", i)).collect::<Vec<String>>();
         let middle = middle.join(" -> ");
-        format!("r{}[{middle}]", self.id)
+        format!("r{}[{middle}--c{}]", self.id, self.used_cap)
     }
     pub fn new(instance: Arc<VRPInstance>, id: usize) -> Self {
         Route { stops: Vec::with_capacity(instance.num_customers), instance, cost: 0f64, used_cap: 0, id }
@@ -338,6 +363,30 @@ impl Route {
         (new_cost, self.used_cap - self.stops[index].capacity <= self.instance.vehicle_capacity)
     }
 
+    pub fn cost_if_cust_no_was(&self, new_stop: &Stop, index: usize) -> f64 {
+        self.assert_sanity();
+        assert!(index < self.stops.len());
+        // assert!(self.stops[index])
+        let old_stop = &self.stops[index];
+
+        let mut new_cost = self.cost; // TODO: could change to be relative
+
+        let before = if index != 0 {
+            self.stops[index - 1].cust_no
+        } else { 0 };
+
+        let after = if index != (self.stops.len() - 1) {
+            self.stops[index + 1].cust_no
+        } else { 0 };
+
+        new_cost -= self.instance.distance_matrix.dist(before, old_stop.cust_no);
+        new_cost -= self.instance.distance_matrix.dist(old_stop.cust_no, after);
+        new_cost += self.instance.distance_matrix.dist(before, new_stop.cust_no);
+        new_cost += self.instance.distance_matrix.dist(new_stop.cust_no, after);
+
+        new_cost
+    }
+
     // -1      0         1
     // 0 -> stop[0] -> stop[1] -...-> stop[len - 1] -> 0
     /// The cost of going from the previous index to `index`. (if `index` == `len`, cost of going home after...)
@@ -368,6 +417,10 @@ impl Route {
     }
     
     fn check_route_cost(&self) {
+        assert!((self.recalculate_cost() - self.cost).abs() < 0.5f64);
+    }
+
+    fn recalculate_cost(&self) -> f64 {
         let mut cost = 0f64;
 
         for i in 1..self.stops.len() {
@@ -378,17 +431,15 @@ impl Route {
             cost += self.instance.distance_matrix.dist(0, self.stops[0].cust_no);
             cost += self.instance.distance_matrix.dist(self.stops[self.stops.len() - 1].cust_no, 0);
         }
-
-        // println!("got cost {:?} for {:?} (vs {:?})", cost, self, self.cost);
-
-        assert!((cost - self.cost).abs() < 0.5f64);
+        cost
     }
 
     fn check_capacity(&self) {
-        let real_cap: usize = self.stops.iter().map(|s|{
-            s.capacity
-        }).sum();
-        assert!(real_cap == self.used_cap);
+        assert!(self.recalculate_capacity() == self.used_cap);
+    }
+
+    fn recalculate_capacity(&self) -> usize {
+        self.stops.iter().map(|s|{ s.capacity }).sum()
     }
 
     fn check_no_duplicate_stops(&self) {
