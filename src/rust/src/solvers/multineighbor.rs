@@ -42,7 +42,7 @@ impl LNSSolver for MultiLNSSolver {
         // TODO: tune the number of stops to remove / have it be variable??
         // println!("Cost: {}", self.current.cost());
         // println!("Solution before destroying: {:?}", self.current);
-        let removed_stops = self.remove_n_random_stops(3);
+        let removed_stops = self.remove_n_random_stops(5);
 
         for (stop, route_idx) in removed_stops.iter() {
             *self

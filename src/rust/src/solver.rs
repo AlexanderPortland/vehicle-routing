@@ -12,6 +12,7 @@ pub enum TermCond {
 
 pub struct SolveParams {
     pub terminate: TermCond,
+    pub frac_dropped: f64,
     /// jump after this many stagnant iterations
     pub patience: usize,
     // should be set of constructors to use one after the other...
@@ -133,18 +134,15 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
     let mut iterations_since_prev_new_best = 0;
     let mut last_cost = best.cost();
     let mut rng = rand::rng();
-    let mut frac_dropped= 0.05;
-    let mut patience = (instance.num_customers as f64 * frac_dropped).ceil() as usize;
 
-    let iters: Box<dyn Iterator<Item = usize>> = match params.terminate {
+    let mut iters: Box<dyn Iterator<Item = usize>> = match params.terminate {
         TermCond::MaxIters(max) => Box::new(0..max),
         TermCond::TimeElapsed(_) => Box::new(0..),
     };
+    let mut patience = params.patience as f64;
 
     let start = Instant::now();
-    let mut total_iters = 0;
-    for iter in iters {
-        total_iters += 1;
+    for iter in &mut iters {
         if let TermCond::TimeElapsed(max_time) = params.terminate {
             if start.elapsed() > max_time { break; }
         }
@@ -195,21 +193,20 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
                 solver.jump_to_solution(old_solution);
             }
         }
-        if iter % 100 == 0 {dbg_println!("iter {:?} has cost {:?}", iter, solver.cost());}
+        if iter % 10000 == 0 {dbg_println!("iter {:?} has cost {:?}", iter, solver.cost());}
 
         last_cost = new_cost;
 
-        if stagnant_iterations > patience {
-            dbg_println!("Restarting...");
+        if stagnant_iterations as f64 > patience {
+            patience = (instance.num_customers as f64 / 10f64).max(0.99f64 * patience);
+            dbg_println!("Restarting with patience {}...", patience);
             stagnant_iterations = 0;
-            frac_dropped = (0.2f64).min(0.01 + (iterations_since_prev_new_best as f64 / total_iters as f64));
-            patience = (instance.num_customers as f64 * frac_dropped).ceil() as usize;
-            let new_sol = if rng.random_bool(0.5) { 
+            let new_sol = if rng.random_bool(0.1) { 
                 dbg_println!("Jumping from current jump best...");
-                (params.jumper)(&instance, best_for_jump.clone(), frac_dropped)
+                (params.jumper)(&instance, best_for_jump.clone(), params.frac_dropped)
             } else {
                 dbg_println!("Jumping from globally found best...");
-                (params.jumper)(&instance, best.clone(), frac_dropped)
+                (params.jumper)(&instance, best.clone(), params.frac_dropped)
             };
             solver.get_stats_mut().on_restart(iter);
             best_cost_for_jump = new_sol.cost();
@@ -217,6 +214,13 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
             solver.jump_to_solution(new_sol);
         }
     }
+
+    let total_iters = match params.terminate {
+        TermCond::MaxIters(max) => max,
+        TermCond::TimeElapsed(_) => iters.next().unwrap() - 1,
+    };
+
+    println!("got through {:?} iters", total_iters);
 
     dbg_println!("Stats: {:?}", solver.get_stats_mut());
     best

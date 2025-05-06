@@ -8,7 +8,17 @@ use crate::{common::{Stop, VRPSolution}, dbg_println, vrp_instance::{self, VRPIn
 
 // type Jumper = fn(&Arc<VRPInstance>, VRPSolution) -> VRPSolution;
 
-pub fn random_drop(vrp_instance: &Arc<VRPInstance>, mut existing: VRPSolution, frac_dropped: f64) -> VRPSolution {
+
+pub fn random_jump(vrp_instance: &Arc<VRPInstance>, mut existing: VRPSolution, frac_dropped: f64) -> VRPSolution {
+    for i in 0..5 {
+        if let Ok(sol) = random_drop(vrp_instance, existing.clone(), frac_dropped) {
+            return sol;
+        }
+    }
+    panic!("random_jump failed");
+}
+
+pub fn random_drop(vrp_instance: &Arc<VRPInstance>, mut existing: VRPSolution, frac_dropped: f64) -> Result<VRPSolution, String> {
     // println!("existing solution (max cap {:?}) is {:?}", vrp_instance.vehicle_capacity, existing);
 
     dbg_println!("JUMPING (*random drop technique* dropping {:?}%)", frac_dropped * 100f64);
@@ -52,12 +62,14 @@ pub fn random_drop(vrp_instance: &Arc<VRPInstance>, mut existing: VRPSolution, f
                 break;
             }
         }
-        assert!(was_added);
+        if !was_added {
+            return Err("didn't work".to_string());
+        }
     }
 
     // println!("--have existing {:?} w/ cost {:?} now", existing, existing.cost());
 
 
     // todo!("would ret existing {:?} here", existing);
-    existing
+    Ok(existing)
 }
