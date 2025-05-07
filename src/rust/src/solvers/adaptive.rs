@@ -78,8 +78,8 @@ impl LNSSolver for ALNSSolver {
         }
     }
 
-    fn current(&self) -> VRPSolution {
-        return self.current.clone();
+    fn current(&self) -> &VRPSolution {
+        return &self.current;
     }
 
     fn destroy(&mut self) -> Self::DestroyResult {
@@ -108,7 +108,7 @@ impl LNSSolver for ALNSSolver {
         &mut self.stats
     }
 
-    fn repair(&mut self, res: Self::DestroyResult) -> Result<VRPSolution, String> {
+    fn repair(&mut self, res: Self::DestroyResult) -> Result<(), String> {
         let route_idxs = if rng().random_bool(self.repair_ops[0].weight / (self.repair_ops[0].weight + self.destroy_ops[1].weight)) {
             self.last_used_repair_op = 0;
             self.reinsert_n_stops_in_best_spots(res)?
@@ -121,11 +121,13 @@ impl LNSSolver for ALNSSolver {
             *self.stats.route_add_freq.entry(route_idx).or_insert(0) += 1;
         }
         // println!("Current solution: {:?}", self.current);
-        Ok(self.current.clone())
+        // write_out_sol.clone_from(&self.current);
+        Ok(())
     }
 
-    fn jump_to_solution(&mut self, sol: VRPSolution) {
-        self.current = sol;
+    fn jump_to_solution(&mut self, sol: &VRPSolution) {
+        self.current.clone_from(sol); // clone directly into exising allocations
+        // self.current = sol;
         // for s in self.
         self.stop_not_tabu = (1..self.instance.num_customers).collect();
         self.stop_tabu.clear();

@@ -73,9 +73,46 @@ impl Stop {
 }
 
 
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct VRPSolution {
     pub routes: Vec<Route>,
+}
+
+impl Clone for VRPSolution {
+    fn clone(&self) -> Self {
+        // println!("cloning normally");
+        VRPSolution { routes: self.routes.clone() }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        // println!("cloning from ...");
+        assert!(self.routes.len() == source.routes.len());
+
+        for (my_route, source_route) in self.routes.iter_mut().zip(source.routes.iter()) {
+            let Route { instance, id, stops, cost, used_cap } = my_route;
+            // println!("stops is {:?} w/ cap {:?}, source is {:?} w/ cap {:?}", stops, stops.capacity(), source_route.stops, source_route.stops.capacity());
+            assert!(stops.capacity() == source_route.stops.capacity());
+
+            *instance = source_route.instance.clone();
+            *id = source_route.id;
+            *cost = source_route.cost;
+            *used_cap = source_route.used_cap;
+
+            // println!("old stops is {:?}", stops);
+
+            // copy over stops to use exisiting allocation
+            // SAFETY: both vectors have the same capacity, which much be less than the source vec's length.
+            //         that means we can safely copy that many elements into the destination.
+            unsafe { 
+                std::ptr::copy(source_route.stops.as_ptr(), stops.as_mut_ptr(), source_route.stops.len()); 
+                stops.set_len(source_route.stops.len());
+            }
+
+            // println!("new stops is {:?}", stops);
+
+            // todo!();
+        }
+    }
 }
 
 
@@ -194,13 +231,22 @@ impl VRPSolution {
 
 
 
-#[derive(Clone)]
+// #[derive(Clone)]
+#[repr(C)]
 pub struct Route {
+    used_cap: usize,
     pub instance: std::sync::Arc<VRPInstance>,
     id: usize,
     stops: Vec<Stop>,
-    cost: f64,
-    used_cap: usize
+    cost: f64
+}
+
+impl Clone for Route {
+    fn clone(&self) -> Self {
+        let mut new_stops = Vec::with_capacity(self.stops.capacity());
+        new_stops.extend(self.stops.clone());
+        Self { instance: self.instance.clone(), id: self.id, stops: new_stops, cost: self.cost, used_cap: self.used_cap }
+    }
 }
 
 impl std::fmt::Debug for Route {
@@ -328,8 +374,13 @@ impl Route {
         self.assert_sanity();
         debug_assert!(index <= self.stops.len());
 
+        
+        let c = self.instance.vehicle_capacity;
+        let e = stop.capacity;
+
+        let f = self.used_cap; // TODO: why the hell is this so slow...
+
         let mut new_cost = self.cost; // TODO: could change to be relative
-        new_cost -= self.cost_at_index(index);
 
         let before = if index != 0 {
             // SAFETY: exactly same as for in self.cost_at_index 
@@ -342,13 +393,14 @@ impl Route {
             unsafe { self.stops.get_unchecked(index).cust_no }
         } else { 0 };
 
+        new_cost -= self.instance.distance_matrix.dist(before, after);
         new_cost += self.instance.distance_matrix.dist(before, stop.cust_no);
         new_cost += self.instance.distance_matrix.dist(stop.cust_no, after);
 
+
         let a = new_cost;
-        let c = self.instance.vehicle_capacity;
-        let e = stop.capacity;
-        let f = self.used_cap; // TODO: why the hell is this so slow...
+        // let jj = std::hint::black_box((self.cost, self.used_cap));
+        
         let b = e + f <= c;
         let res = (a, b);
 

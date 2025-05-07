@@ -35,8 +35,8 @@ impl LNSSolver for SimpleLNSSolver {
         }
     }
 
-    fn current(&self) -> VRPSolution {
-        return self.current.clone();
+    fn current(&self) -> &VRPSolution {
+        return &self.current;
     }
 
     fn destroy(&mut self) -> Self::DestroyResult {
@@ -54,14 +54,14 @@ impl LNSSolver for SimpleLNSSolver {
         &mut self.stats
     }
 
-    fn repair(&mut self, res: Self::DestroyResult) -> Result<VRPSolution, String> {
+    fn repair(&mut self, res: Self::DestroyResult) -> Result<(), String> {
         let route_idx = Self::reinsert_in_best_spot(&mut self.current, res.0);
         *self.stats.route_add_freq.entry(route_idx).or_insert(0) += 1;
-        Ok(self.current.clone())
+        Ok(())
     }
 
-    fn jump_to_solution(&mut self, sol: VRPSolution) {
-        self.current = sol;
+    fn jump_to_solution(&mut self, sol: &VRPSolution) {
+        self.current = sol.clone();
 
         // ! UNDO THIS LATER
         // self.tabu.clear();
