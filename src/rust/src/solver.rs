@@ -172,7 +172,7 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
             (best_cost_for_jump, best_for_jump) = (new_cost, new_solution.clone());
         }
         if new_cost + 0.1 < best_cost {
-            (best_cost, best) = (new_cost, new_solution);
+            (best_cost, best) = (new_cost, new_solution.clone());
             iterations_since_prev_new_best = 0;
             dbg_println!("new_best: {}", best_cost);
         } else {

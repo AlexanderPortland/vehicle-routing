@@ -192,7 +192,7 @@ impl ALNSSolver {
         let (mut best_spot_r, mut best_spot_i, mut best_spot_cost_increase) =
             (usize::MAX, usize::MAX, f64::MAX);
 
-        let mut valid = Vec::new();
+        let mut valid = Vec::with_capacity(self.instance.num_customers);
 
         for (r, route) in self.current.routes.iter().enumerate() {
             for i in 0..(route.stops().len() + 1) {
