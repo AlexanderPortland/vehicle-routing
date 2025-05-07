@@ -209,6 +209,7 @@ dependencies = [
  "ordered-float",
  "rand",
  "rand_distr",
+ "serde",
  "serde_json",
 ]
 

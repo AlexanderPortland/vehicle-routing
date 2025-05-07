@@ -227,6 +227,25 @@ impl VRPSolution {
 
         map
     }
+
+    pub fn check(&self) {
+        for r in self.routes.iter() {
+            r.assert_sanity();
+        }
+
+        for cust_no in 1..self.routes[0].instance.num_customers {
+            let mut found = false;
+            for r in self.routes.iter() {
+                if r.contains_stop(cust_no.try_into().unwrap()) {
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                panic!("solution was wrong");
+            }
+        }
+    }
 }
 
 

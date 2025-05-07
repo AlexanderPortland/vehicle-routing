@@ -22,6 +22,7 @@ pub struct SolveParams {
     pub constructor: fn(&Arc<VRPInstance>) -> VRPSolution,
     // could also be a set of jumpers to use randomly between them
     pub jumper: fn(&Arc<VRPInstance>, VRPSolution, f64) -> VRPSolution,
+    pub initial_solution: Option<VRPSolution>
 }
 
 // trait for a large neighborhood search (LNS) solver
@@ -139,7 +140,16 @@ type SolveResult = (VRPSolution, SolveStats);
 
 /// Completely solve a VRP instance and return the best solution found.
 pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams) -> VRPSolution {
-    let initial_solution = (params.constructor)(&instance);
+    let initial_solution = match params.initial_solution {
+        Some(sol) => {
+            println!("Starting with initial_solution of cost: {}", sol.cost());
+            sol
+        },
+        None => {
+            println!("Constructing a new solution");
+            (params.constructor)(&instance)
+        }
+    };
     let mut solver = S::new(instance.clone(), initial_solution.clone());
 
     let mut best = initial_solution; // TODO: stop cloning these
@@ -195,7 +205,7 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
             iterations_since_prev_new_best = 0;
             // update ALNS
             solver.update_scores(10);
-            println!("new_best: {}", best_cost);
+            // println!("new_best: {}", best_cost);
         } else {
             iterations_since_prev_new_best += 1;
         }
@@ -228,7 +238,7 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
             solver.update_weights();
             
         }
-        if iter % 10000 == 0 {
+        if iter % 100000 == 0 {
             println!("iter {:?} has cost {:?}", iter, solver.cost());
         }
 
@@ -285,7 +295,7 @@ where
         let destroy_res = self.destroy();
         self.update_tabu(&destroy_res);
 
-        // TOOD: refactor yuckiness here
+        // TODO: refactor yuckiness here
         let new_sol: Option<()> = match self.repair(destroy_res) { // repair has to clone here too...
             Ok(_) => Some(()),
             Err(_) => None,
