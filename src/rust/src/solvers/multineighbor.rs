@@ -160,6 +160,7 @@ impl MultiLNSSolver {
         let (mut best_spot_r, mut best_spot_i, mut best_spot_cost_increase) =
             (usize::MAX, usize::MAX, f64::MAX);
 
+        // OPT: use with_capacity here to avoid continuous reallocation on push
         let mut valid = Vec::with_capacity(self.instance.num_customers);
 
         for (r, route) in self.current.routes.iter().enumerate() {

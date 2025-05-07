@@ -17,13 +17,29 @@ macro_rules! dbg_println {
 //     };
 // }
 
-pub struct DistanceMatrix(Vec<Vec<f64>>);
+pub struct DistanceMatrix(&'static mut [&'static mut [f64]]);
 
 impl DistanceMatrix {
-    pub fn new(vec: Vec<Vec<f64>>) -> Self { DistanceMatrix(vec) }
+    pub fn new(vec: Vec<Vec<f64>>) -> Self { 
+        let v = vec.into_iter().map(|v|{
+            v.leak()
+        }).collect::<Vec<_>>().leak();
+
+        DistanceMatrix(v)
+    }
 
     pub fn dist<T: Into<usize>>(&self, a: T, b: T) -> f64 {
-        self.0[a.into()][b.into()]
+        let (a, b): (usize, usize) = (a.into(), b.into());
+
+        debug_assert!(a < self.0.len());
+        debug_assert!(b < self.0[a].len());
+
+        // SAFETY: we gotta trust ourselves here that we did the bounds checking 
+        //         properly outside this function. if we believe, and use the power of friendship,
+        //         i think nothings impossible.
+        let a = unsafe { self.0.get_unchecked(a).get_unchecked(b) };
+        
+        *a
     }
 }
 
@@ -193,28 +209,6 @@ impl std::fmt::Debug for Route {
     }
 }
 
-// impl Clone for Route {
-//     fn clone(&self) -> Self {
-//         // println!("CLONING {:?}", self);
-//         // println!("old vec is {:?} -- cap {:?}", self.stops, self.stops.capacity());
-//         let mut new_stops = Vec::with_capacity(self.stops.capacity());
-
-//         // SAFETY: the memory regions for both vectors will not overlap, and both will be valid for 
-//         //         self.stops.cap length. 
-//         unsafe {
-//             std::ptr::copy_nonoverlapping(self.stops.as_ptr(), new_stops.as_mut_ptr(), self.stops.len());
-//             new_stops.set_len(self.stops.len());
-//         }
-//         // let new_stops = self.stops.clone();
-
-//         // println!("new vec is {:?} -- cap {:?}", new_stops, new_stops.capacity());
-
-//         // todo!();
-
-//         Route { instance: self.instance.clone(), id: self.id, stops: new_stops, cost: self.cost, used_cap: self.used_cap }
-//     }
-// }
-
 impl Route {
     pub fn retain_stops(&mut self, f: impl Fn(&Stop) -> bool) {
         self.assert_sanity();
@@ -332,23 +326,31 @@ impl Route {
     // the change in cost for how much adding 
     pub fn speculative_add_stop(&self, stop: &Stop, index: usize) -> (f64, bool) {
         self.assert_sanity();
-        assert!(index <= self.stops.len());
+        debug_assert!(index <= self.stops.len());
 
         let mut new_cost = self.cost; // TODO: could change to be relative
         new_cost -= self.cost_at_index(index);
 
         let before = if index != 0 {
-            self.stops[index - 1].cust_no
+            // SAFETY: exactly same as for in self.cost_at_index 
+            //         (should probably reuse code eventually...)
+            unsafe { self.stops.get_unchecked(index - 1).cust_no }
         } else { 0 };
 
         let after = if index != self.stops.len() {
-            self.stops[index].cust_no
+            // SAFETY: see above ^^
+            unsafe { self.stops.get_unchecked(index).cust_no }
         } else { 0 };
 
         new_cost += self.instance.distance_matrix.dist(before, stop.cust_no);
         new_cost += self.instance.distance_matrix.dist(stop.cust_no, after);
 
-        let res = (new_cost, self.used_cap + stop.capacity <= self.instance.vehicle_capacity);
+        let a = new_cost;
+        let c = self.instance.vehicle_capacity;
+        let e = stop.capacity;
+        let f = self.used_cap; // TODO: why the hell is this so slow...
+        let b = e + f <= c;
+        let res = (a, b);
 
         return res;
     }
@@ -414,14 +416,19 @@ impl Route {
     // 0 -> stop[0] -> stop[1] -...-> stop[len - 1] -> 0
     /// The cost of going from the previous index to `index`. (if `index` == `len`, cost of going home after...)
     pub fn cost_at_index(&self, index: usize) -> f64 {
-        assert!(index <= self.stops.len());
+        debug_assert!(index <= self.stops.len());
 
         let start = if index != 0 {
-            self.stops[index - 1].cust_no
+            // SAFETY: since index is a usize and it cannot be 0, index - 1 cannot be OOB below.
+            //         we also have to trust that we aren't passing in an index > (self.stops.len() + 1),
+            //         which we would have noticed by now if we did!!
+            unsafe { self.stops.get_unchecked(index - 1).cust_no }
         } else { 0 };
 
         let end = if index != self.stops.len() {
-            self.stops[index].cust_no
+            // SAFETY: we have to trust here that index isn't > self.stops.len(), but we have debug
+            //         asserts for that so i'm confident the logic elsewhere accounts for that...
+            unsafe { self.stops.get_unchecked(index).cust_no }
         } else { 0 };
 
         self.instance.distance_matrix.dist(start, end)
