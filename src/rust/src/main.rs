@@ -46,8 +46,8 @@ fn main() {
     let sol = solver::solve::<solvers::MultiLNSSolver>(
         Arc::new(vrp_instance), 
         SolveParams {
-            // terminate: TermCond::MaxIters(50000),
-            terminate: TermCond::TimeElapsed(Duration::from_secs(15 * 1)),
+            terminate: TermCond::MaxIters(50000),
+            // terminate: TermCond::TimeElapsed(Duration::from_secs(15 * 1)),
             frac_dropped,
             patience,
             constructor: construct::clarke_wright_and_then_sweep,

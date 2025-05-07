@@ -374,10 +374,13 @@ impl Route {
         self.assert_sanity();
         debug_assert!(index <= self.stops.len());
 
+        
+        let c = self.instance.vehicle_capacity;
+        let e = stop.capacity;
+
         let f = self.used_cap; // TODO: why the hell is this so slow...
 
         let mut new_cost = self.cost; // TODO: could change to be relative
-        new_cost -= self.cost_at_index(index);
 
         let before = if index != 0 {
             // SAFETY: exactly same as for in self.cost_at_index 
@@ -390,12 +393,12 @@ impl Route {
             unsafe { self.stops.get_unchecked(index).cust_no }
         } else { 0 };
 
+        new_cost -= self.instance.distance_matrix.dist(before, after);
         new_cost += self.instance.distance_matrix.dist(before, stop.cust_no);
         new_cost += self.instance.distance_matrix.dist(stop.cust_no, after);
 
+
         let a = new_cost;
-        let c = self.instance.vehicle_capacity;
-        let e = stop.capacity;
         // let jj = std::hint::black_box((self.cost, self.used_cap));
         
         let b = e + f <= c;
