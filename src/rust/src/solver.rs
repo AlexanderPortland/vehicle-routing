@@ -207,14 +207,14 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
         last_cost = new_cost;
 
         if stagnant_iterations as f64 > params.patience as f64 {
-            dbg_println!("Restarting with patience {}...", params.patience);
+            // dbg_println!("Restarting with patience {}...", params.patience);
             stagnant_iterations = 0;
 
             let new_sol = if rng.random_bool(0.2) {
-                dbg_println!("Jumping from current jump best...");
+                // dbg_println!("Jumping from current jump best...");
                 (params.jumper)(&instance, best_for_jump.clone(), params.frac_dropped)
             } else {
-                dbg_println!("Jumping from globally found best...");
+                // dbg_println!("Jumping from globally found best...");
                 (params.jumper)(&instance, best.clone(), params.frac_dropped)
             };
 

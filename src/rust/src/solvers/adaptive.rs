@@ -43,7 +43,7 @@ impl LNSSolver for ALNSSolver {
 
     fn destroy(&mut self) -> Self::DestroyResult {
         // TODO: tune the number of stops to remove / have it be variable??
-        let removed_stops = self.remove_n_random_stops(5);
+        let removed_stops = self.remove_n_shaw(20);
 
         for (stop, route_idx) in removed_stops.iter() {
             *self
@@ -97,24 +97,36 @@ impl LNSSolver for ALNSSolver {
 impl ALNSSolver {
     fn remove_n_shaw(&mut self, n: usize) -> Vec<(Stop, usize)> {
         let seed_cust_no = rng().random_range(1..self.instance.num_customers);
-        let mut customer_nos = vec![seed_cust_no];
-        let mut similarity_scores: Vec<(usize, f64)> = Vec::new();
+        let alpha = 0.1;
+        let beta = 1.0;
+        
+        let tabu = &self.stop_tabu;
+        let sol = &mut self.current;
 
-        let alpha = 1.0;
-        let beta = 0.1;
+        let mut similarity_scores: Vec<(usize, f64)> = (1..self.instance.num_customers).map(|cust_no| {
+            let dist = self.instance.distance_matrix.dist(seed_cust_no, cust_no);
+            let demand_diff = (self.instance.demand_of_customer[seed_cust_no] as f64 - self.instance.demand_of_customer[cust_no] as f64).abs();
+            let score = alpha * dist + beta * demand_diff;
+            (cust_no, score)
+        }).collect();
+        similarity_scores.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
-        for cust_no in 1..self.instance.num_customers {
-            if cust_no != seed_cust_no {
-                let dist = self.instance.distance_matrix.dist(seed_cust_no, cust_no);
-                let demand_diff = (self.instance.demand_of_customer[seed_cust_no] as f64 - self.instance.demand_of_customer[cust_no] as f64).abs();
-                let score = alpha * dist + beta * demand_diff;
-                similarity_scores.push((cust_no, score));
-            }
+        let mut customer_nos = Vec::new();
+        for i in 0..n {
+            customer_nos.push(similarity_scores[i].0);
         }
 
-
-
-        Vec::new()
+        let mut res = Vec::new();
+        for cust_no in customer_nos {
+            for (route_idx, route) in sol.routes.iter_mut().enumerate() {
+                if let Some(index) = route.index_of_stop(cust_no.try_into().unwrap()) {
+                    let removed_stop = route.remove_stop_at_index(index);
+                    res.push((removed_stop, route_idx));
+                    break;
+                }
+            }
+        }
+        res
     }
 
     fn remove_n_random_stops(&mut self, n: usize) -> Vec<(Stop, usize)> {
@@ -210,5 +222,27 @@ impl ALNSSolver {
 
         // println!("Solution after inserting {:?}: {:?}", stop, self.current);
         return Ok(best_spot_r);
+    }
+
+    fn reinsert_two_regret(&mut self, removed_stops: Vec<(Stop, usize)>) -> Result<Vec<usize>, String> {
+        let mut res = Vec::new();
+        let mut removed_stops = removed_stops.clone();
+
+        removed_stops.sort_by_key(|x| {
+            
+        });
+
+        for (stop, _) in removed_stops {
+            res.push(self.reinsert_in_best_spot(stop)?);
+        }
+        Ok(res)
+    }
+
+    fn two_regret(&self, stop: Stop) -> Result<f64, String> {
+
+        for route_idx in 0..self.instance.num_vehicles {
+            todo!()
+        }
+        todo!()
     }
 }

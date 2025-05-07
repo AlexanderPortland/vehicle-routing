@@ -39,15 +39,15 @@ fn main() {
     let vrp_instance = VRPInstance::new(file_path);
     let frac_dropped = 0.0;
     // let patience = (vrp_instance.num_customers as f64 * frac_dropped) as usize;
-    let patience = 50;
+    let patience = 1;
 
     // 26.5k
 
     let sol = solver::solve::<solvers::MultiLNSSolver>(
         Arc::new(vrp_instance), 
         SolveParams {
-            // terminate: TermCond::MaxIters(2000000),
-            terminate: TermCond::TimeElapsed(Duration::from_secs(300 * 1)),
+            terminate: TermCond::MaxIters(3000000),
+            // terminate: TermCond::TimeElapsed(Duration::from_secs(300 * 1)),
             frac_dropped: frac_dropped,
         patience: patience,
             constructor: construct::clarke_wright_and_then_sweep,
