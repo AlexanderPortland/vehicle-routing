@@ -78,6 +78,10 @@ impl LNSSolver for SimpleLNSSolver {
         let mut move_history = self.moves.iter().collect::<Vec<(&Stop, &usize)>>();
         move_history.sort_by(|a, b| a.1.cmp(b.1));
     }
+
+    fn update_scores(&mut self, delta: usize) {}
+
+    fn update_weights(&mut self) {}
 }
 
 impl SimpleLNSSolver {

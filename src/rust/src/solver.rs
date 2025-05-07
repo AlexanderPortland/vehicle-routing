@@ -46,6 +46,10 @@ pub trait LNSSolver {
 
     // Optionally update the tabu for the solver.
     fn update_tabu(&mut self, res: &Self::DestroyResult) {}
+
+    fn update_scores(&mut self, delta: usize);
+
+    fn update_weights(&mut self);
 }
 
 pub trait IterativeSolver {
@@ -58,6 +62,10 @@ pub trait IterativeSolver {
     fn get_stats_mut(&mut self) -> &mut SolveStats;
 
     fn cost(&self) -> f64;
+
+    fn update_scores(&mut self, delta: usize);
+
+    fn update_weights(&mut self);
 }
 
 // #[cfg(debug_assertions)]
@@ -174,7 +182,9 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
         if new_cost + 0.1 < best_cost {
             (best_cost, best) = (new_cost, new_solution.clone());
             iterations_since_prev_new_best = 0;
-            dbg_println!("new_best: {}", best_cost);
+            // update ALNS
+            solver.update_scores(10);
+            println!("new_best: {}", best_cost);
         } else {
             iterations_since_prev_new_best += 1;
         }
@@ -186,13 +196,15 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
 
         if new_cost + 0.1 < last_cost {
             // improvement
-            // dbg_println!("IMPROVED {:?} <- {:?}", new_cost, last_cost);
             stagnant_iterations = 0;
-            // solver already has new_solution set as current
+
+            // update ALNS
+            solver.update_scores(5);
         } else {
+            // update ALNS
+            solver.update_scores(1);
             // no improvement
             stagnant_iterations += 1;
-            // dbg_println!("STAGNANT {:?} <- {:?}", new_cost, last_cost);
 
             // simmulated annealing — with 0.1 probability, do not revert to the old solution (i.e. accept the new, worse solution)
             if rng.random_bool(0.9) {
@@ -200,8 +212,13 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
                 solver.jump_to_solution(old_solution);
             }
         }
+        if iter % 1000 == 0 {
+            // println!("Updating weights...");
+            solver.update_weights();
+            
+        }
         if iter % 10000 == 0 {
-            dbg_println!("iter {:?} has cost {:?}", iter, solver.cost());
+            println!("iter {:?} has cost {:?}", iter, solver.cost());
         }
 
         last_cost = new_cost;
@@ -265,5 +282,13 @@ where
 
     fn cost(&self) -> f64 {
         self.current().cost()
+    }
+
+    fn update_scores(&mut self, delta: usize) {
+        self.update_scores(delta);
+    }
+
+    fn update_weights(&mut self) {
+        self.update_weights();
     }
 }

@@ -1,5 +1,5 @@
 use std::{
-    cmp::Reverse, collections::{HashMap, VecDeque}, sync::Arc
+    cmp::Reverse, collections::{BinaryHeap, HashMap, VecDeque}, sync::Arc
 };
 
 use rand::{rng, rngs::ThreadRng, seq::SliceRandom, Rng};
@@ -9,6 +9,39 @@ use crate::construct;
 use crate::solver::stats::SolveStats;
 use crate::solver::{IterativeSolver, LNSSolver};
 use crate::vrp_instance::VRPInstance;
+use ordered_float::OrderedFloat;
+
+use rand::prelude::*;
+
+#[derive(Debug, Clone)]
+struct Operator {
+    id: usize,
+    score: usize,
+    weight: f64,
+    usage_count: usize,
+}
+
+impl Operator {
+    fn new(id: usize) -> Self {
+        Self {
+            id,
+            score: 0,
+            weight: 1.0,
+            usage_count: 0,
+        }
+    }
+
+    fn update_score(&mut self, delta: usize) {
+        self.score += delta;
+        self.usage_count += 1;
+    }
+
+    fn update_weight(&mut self, learning_rate: f64) {
+        self.weight = (1.0 - learning_rate) * self.weight + learning_rate * (self.score as f64);
+        self.score = 0;
+    }
+}
+
 
 /// An LNS solver which greedily **removes the highest cost stop** from the solution,
 /// **inserting it at the lowest cost location**.
@@ -19,21 +52,29 @@ pub struct ALNSSolver {
     current: VRPSolution,
     stats: SolveStats,
     rng: ThreadRng,
+    repair_ops: Vec<Operator>,
+    destroy_ops: Vec<Operator>,
+    last_used_repair_op: usize,
+    last_used_destroy_op: usize,
 }
 
 impl LNSSolver for ALNSSolver {
+
     /// corresponding to the (cust_no, route #) that was removed
     type DestroyResult = Vec<(Stop, usize)>;
 
     fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self {
-        // println!("num customers is {:?}", instance.num_customers);
         ALNSSolver {
             stop_tabu: VecDeque::new(),
             current: initial_solution,
             stop_not_tabu: (1..instance.num_customers).collect(),
             instance,
             stats: SolveStats::new(),
-            rng: rand::rng()
+            rng: rand::rng(),
+            repair_ops: vec![Operator::new(0), Operator::new(1)],
+            destroy_ops: vec![Operator::new(0), Operator::new(1)],
+            last_used_destroy_op: 0,
+            last_used_repair_op: 0
         }
     }
 
@@ -43,7 +84,13 @@ impl LNSSolver for ALNSSolver {
 
     fn destroy(&mut self) -> Self::DestroyResult {
         // TODO: tune the number of stops to remove / have it be variable??
-        let removed_stops = self.remove_n_shaw(20);
+        let removed_stops = if rng().random_bool(self.destroy_ops[0].weight / (self.destroy_ops[0].weight + self.destroy_ops[1].weight)) {
+            self.last_used_destroy_op = 0;
+            self.remove_n_random_stops(5)
+        } else {
+            self.last_used_destroy_op = 1;
+            self.remove_n_shaw(5)
+        };
 
         for (stop, route_idx) in removed_stops.iter() {
             *self
@@ -62,7 +109,13 @@ impl LNSSolver for ALNSSolver {
     }
 
     fn repair(&mut self, res: Self::DestroyResult) -> Result<VRPSolution, String> {
-        let route_idxs = self.reinsert_n_stops_in_best_spots(res)?;
+        let route_idxs = if rng().random_bool(self.repair_ops[0].weight / (self.repair_ops[0].weight + self.destroy_ops[1].weight)) {
+            self.last_used_repair_op = 0;
+            self.reinsert_n_stops_in_best_spots(res)?
+        } else {
+            self.last_used_repair_op = 1;
+            self.reinsert_two_regret(res)?
+        };
 
         for route_idx in route_idxs {
             *self.stats.route_add_freq.entry(route_idx).or_insert(0) += 1;
@@ -92,13 +145,36 @@ impl LNSSolver for ALNSSolver {
             }
         }
     }
+
+    fn update_scores(&mut self, delta: usize) {
+        self.repair_ops[self.last_used_repair_op].update_score(delta);
+        self.destroy_ops[self.last_used_destroy_op].update_score(delta);
+    }
+
+    fn update_weights(&mut self) {
+        for op_idx in 0..self.repair_ops.len() {
+            self.repair_ops[op_idx].update_weight(0.01);
+        }
+
+        for op_idx in 0..self.destroy_ops.len() {
+            self.destroy_ops[op_idx].update_weight(0.01);
+        }
+
+        // for op_idx in 0..self.repair_ops.len() {
+        //     println!("op_idx ({}): weight: {}, # times used: {}", op_idx, self.repair_ops[op_idx].weight, self.repair_ops[op_idx].usage_count);
+        // }
+
+        // for op_idx in 0..self.destroy_ops.len() {
+        //     println!("op_idx ({}): {}, # times used: {}", op_idx, self.destroy_ops[op_idx].weight, self.destroy_ops[op_idx].usage_count);
+        // }
+    }
 }
 
 impl ALNSSolver {
     fn remove_n_shaw(&mut self, n: usize) -> Vec<(Stop, usize)> {
         let seed_cust_no = rng().random_range(1..self.instance.num_customers);
-        let alpha = 0.1;
-        let beta = 1.0;
+        let alpha = 0.5;
+        let beta = 0.5;
         
         let tabu = &self.stop_tabu;
         let sol = &mut self.current;
@@ -109,7 +185,7 @@ impl ALNSSolver {
             let score = alpha * dist + beta * demand_diff;
             (cust_no, score)
         }).collect();
-        similarity_scores.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        similarity_scores.sort_by_key(|(cust_no, score)| OrderedFloat(*score)); 
 
         let mut customer_nos = Vec::new();
         for i in 0..n {
@@ -145,9 +221,6 @@ impl ALNSSolver {
             customer_nos.push(self.stop_not_tabu.swap_remove(rem_index));
         }
         assert!(customer_nos.len() == n);
-        // let mut customer_nos: Vec<usize> = (1..self.instance.num_customers).filter(|x| !tabu.contains(x)).collect();
-        // customer_nos.shuffle(&mut self.rng);
-        // customer_nos.truncate(n);
 
         let mut res = Vec::new();
 
@@ -167,9 +240,6 @@ impl ALNSSolver {
     #[cfg(debug_assertions)]
     fn assert_tabu_sanity(&self) {
         let full_tabu = self.stop_tabu.iter().chain(self.stop_not_tabu.iter()).collect::<Vec<_>>();
-
-        // println!("stop tabu is {:?}, non tabu is {:?}", self.stop_tabu, self.stop_not_tabu);
-        // println!("len is {:?}, num cust is {:?}", full_tabu.len(), self.instance.num_customers - 1);
         assert!(full_tabu.len() == (self.instance.num_customers - 1));
         for cust_no in 1..self.instance.num_customers {
             assert!(full_tabu.contains(&&cust_no));
@@ -228,8 +298,8 @@ impl ALNSSolver {
         let mut res = Vec::new();
         let mut removed_stops = removed_stops.clone();
 
-        removed_stops.sort_by_key(|x| {
-            
+        removed_stops.sort_by_key(|(stop, _)| {
+            Reverse(OrderedFloat(self.regret_k(stop, 2)))
         });
 
         for (stop, _) in removed_stops {
@@ -238,11 +308,33 @@ impl ALNSSolver {
         Ok(res)
     }
 
-    fn two_regret(&self, stop: Stop) -> Result<f64, String> {
+    fn regret_k(&self, stop: &Stop, k: usize) -> f64 {
+        let mut costs = BinaryHeap::new();
+        for route in &self.current.routes {
+            for stop_idx in 0..(route.stops().len() + 1) {
+                let (new_cost, feasible) = route.speculative_add_stop(stop, stop_idx);
+                
+                let cost_increase = new_cost - route.cost();
 
-        for route_idx in 0..self.instance.num_vehicles {
-            todo!()
+                // BinaryHeap is a max heap. Since we want to keep a min-heap of the costs, we wrap in reverse
+                // OrderedFloat is to make life easy w.r.t to putting floats in a heap
+                if feasible {
+                    costs.push(Reverse(OrderedFloat(cost_increase)));
+                }
+
+                if costs.len() > k {
+                    costs.pop();
+                }
+            }
         }
-        todo!()
+
+        if costs.len() < k {
+            return costs.peek().unwrap().0.0;
+        }
+
+        let best = costs.pop().unwrap().0.0;
+        let kth_best = costs.peek().unwrap().0.0;
+
+        kth_best - best
     }
 }

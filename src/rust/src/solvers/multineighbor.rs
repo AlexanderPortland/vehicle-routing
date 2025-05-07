@@ -94,6 +94,10 @@ impl LNSSolver for MultiLNSSolver {
             }
         }
     }
+
+    fn update_scores(&mut self, delta: usize) {}
+
+    fn update_weights(&mut self) {}
 }
 
 impl MultiLNSSolver {
@@ -195,4 +199,6 @@ impl MultiLNSSolver {
         // println!("Solution after inserting {:?}: {:?}", stop, self.current);
         return Ok(best_spot_r);
     }
+
+
 }
