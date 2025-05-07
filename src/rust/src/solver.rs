@@ -30,19 +30,19 @@ pub trait LNSSolver {
 
     fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self;
 
-    fn current(&self) -> VRPSolution;
+    fn current(&self) -> &VRPSolution;
 
     /// Partially destroy the solution.
     fn destroy(&mut self) -> Self::DestroyResult;
 
     /// Repair the solution and return the result.
-    fn repair(&mut self, res: Self::DestroyResult) -> Result<VRPSolution, String>;
+    fn repair(&mut self, res: Self::DestroyResult) -> Result<(), String>;
 
     fn get_stats_mut(&mut self) -> &mut SolveStats;
 
     // / Update the solution to search from next.
     // fn update_search_location(&mut self, new_best: Option<(&VRPSolution, f64)>);
-    fn jump_to_solution(&mut self, sol: VRPSolution);
+    fn jump_to_solution(&mut self, sol: &VRPSolution);
 
     // Optionally update the tabu for the solver.
     fn update_tabu(&mut self, res: &Self::DestroyResult) {}
@@ -51,9 +51,11 @@ pub trait LNSSolver {
 pub trait IterativeSolver {
     fn new(instance: Arc<VRPInstance>, initial_solution: VRPSolution) -> Self;
 
-    fn find_new_solution(&mut self) -> (VRPSolution, Option<VRPSolution>);
+    fn current(&self) -> &VRPSolution;
 
-    fn jump_to_solution(&mut self, sol: VRPSolution);
+    fn find_new_solution(&mut self) -> Option<()>;
+
+    fn jump_to_solution(&mut self, sol: &VRPSolution);
 
     fn get_stats_mut(&mut self) -> &mut SolveStats;
 
@@ -147,21 +149,27 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
     };
 
     let start = Instant::now();
+    let mut new_solution = best.clone();
+    let mut old_solution = best.clone();
     for iter in &mut iters {
         if let TermCond::TimeElapsed(max_time) = params.terminate {
             if start.elapsed() > max_time {
                 break;
             }
         }
-        let (old_solution, new_solution) = solver.find_new_solution();
-        let new_solution = match new_solution {
-            Some(sol) => sol,
-            None => {
-                dbg_println!("failed to produce feasible new solution; reverting to old solution");
-                solver.jump_to_solution(old_solution);
-                continue;
-            }
-        };
+
+        // save old solution first
+        old_solution.clone_from(solver.current());
+
+        // get new solution
+        let new_solution_res = solver.find_new_solution();
+
+        if let None = new_solution_res {
+            dbg_println!("failed to produce feasible new solution; reverting to old solution");
+            solver.jump_to_solution(&old_solution);
+            continue;
+        }
+        new_solution.clone_from(solver.current());
 
         let new_cost = new_solution.cost();
         solver
@@ -169,10 +177,13 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
             .update_on_iter(iter, &new_solution, best_cost - new_cost);
 
         if new_cost + 0.1 < best_cost_for_jump {
-            (best_cost_for_jump, best_for_jump) = (new_cost, new_solution.clone());
+            best_for_jump.clone_from(&new_solution);
+            best_cost_for_jump = new_cost;
+            // (best_cost_for_jump, best_for_jump) = (new_cost, new_solution.clone());
         }
         if new_cost + 0.1 < best_cost {
-            (best_cost, best) = (new_cost, new_solution.clone());
+            best.clone_from(&new_solution);
+            best_cost = new_cost;
             iterations_since_prev_new_best = 0;
             dbg_println!("new_best: {}", best_cost);
         } else {
@@ -197,7 +208,7 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
             // simmulated annealing — with 0.1 probability, do not revert to the old solution (i.e. accept the new, worse solution)
             if rng.random_bool(0.9) {
                 // revert to old solution
-                solver.jump_to_solution(old_solution);
+                solver.jump_to_solution(&old_solution);
             }
         }
         if iter % 10000 == 0 {
@@ -221,7 +232,7 @@ pub fn solve<S: IterativeSolver>(instance: Arc<VRPInstance>, params: SolveParams
             solver.get_stats_mut().on_restart(iter);
             best_cost_for_jump = new_sol.cost();
             best_for_jump = new_sol.clone();
-            solver.jump_to_solution(new_sol);
+            solver.jump_to_solution(&new_sol);
         }
     }
 
@@ -248,18 +259,25 @@ where
         self.get_stats_mut()
     }
 
-    fn find_new_solution(&mut self) -> (VRPSolution, Option<VRPSolution>) {
-        let current_sol = self.current();
-        let destroy_res = self.destroy();
-        self.update_tabu(&destroy_res);
-        let new_sol: Option<VRPSolution> = match self.repair(destroy_res) {
-            Ok(sol) => Some(sol),
-            Err(_) => None,
-        };
-        (current_sol, new_sol)
+    fn current(&self) -> &VRPSolution {
+        self.current()
     }
 
-    fn jump_to_solution(&mut self, sol: VRPSolution) {
+    fn find_new_solution(&mut self) -> Option<()> {
+        // let current_sol = self.current(); // clones here
+        let destroy_res = self.destroy();
+        self.update_tabu(&destroy_res);
+
+        // TOOD: refactor yuckiness here
+        let new_sol: Option<()> = match self.repair(destroy_res) { // repair has to clone here too...
+            Ok(_) => Some(()),
+            Err(_) => None,
+        };
+        // (current_sol, new_sol)
+        new_sol
+    }
+
+    fn jump_to_solution(&mut self, sol: &VRPSolution) {
         self.jump_to_solution(sol);
     }
 
