@@ -38,10 +38,7 @@ fn main() {
     let start = Instant::now();
     let vrp_instance = VRPInstance::new(file_path);
     let frac_dropped = 0.0;
-    // let patience = (vrp_instance.num_customers as f64 * frac_dropped) as usize;
     let patience = 10;
-
-    // 26.5k
 
     let sol = solver::solve::<solvers::ALNSSolver>(
         Arc::new(vrp_instance), 
