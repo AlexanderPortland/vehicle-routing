@@ -45,10 +45,10 @@ fn main() {
 
     let start = Instant::now();
     let frac_dropped = 0.00;
-    let patience = 3;
+    let patience = 10;
     let mut join_handles = Vec::new();
-    let num_cpus = num_cpus::get();
-    println!("NUM CPUS: {}", num_cpus);
+    let num_cpus: usize = num_cpus::get();
+    println!("Running {} threads...", num_cpus);
     for i in 0..num_cpus {
         let vrp_instance = Arc::new(VRPInstance::new(file_path));
         let constructor = if i % 3 == 0 {
@@ -61,7 +61,7 @@ fn main() {
                 vrp_instance,
                 SolveParams {
                     // terminate: TermCond::MaxIters(3000000),
-                    terminate: TermCond::TimeElapsed(Duration::from_secs(100 * 1)),
+                    terminate: TermCond::TimeElapsed(Duration::from_secs(299)),
                     frac_dropped: frac_dropped,
                     patience: patience,
                     constructor: constructor,
