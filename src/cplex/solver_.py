@@ -16,17 +16,17 @@ class VRPSolver:
             for i in range(self.p.num_customers):
                 for j in range(self.p.num_customers):
                     if i != j:
-                        self.edge_var[v][i][j] = self.model.integer_var(0, 1, f"edge: V: {v}, I: {i}, J: {j}")
+                        self.edge_var[v][i][j] = self.model.continuous_var(0, 1, f"edge: V: {v}, I: {i}, J: {j}")
                     else:
-                        self.edge_var[v][i][j] = self.model.integer_var(0, 0, f"edge: NO-OP {v} {i} {j}")
+                        self.edge_var[v][i][j] = self.model.continuous_var(0, 0, f"edge: NO-OP {v} {i} {j}")
 
         self.order_var = np.zeros((self.p.num_vehicles, self.p.num_customers), dtype=object)
         for v in range(self.p.num_vehicles):
             for i in range(self.p.num_customers):
                 if i == 0:
-                    self.order_var[v][i] = self.model.integer_var(0, 0, f"order: NO-OP: {v}, I: {i}")    
+                    self.order_var[v][i] = self.model.continuous_var(0, 0, f"order: NO-OP: {v}, I: {i}")    
                 else:
-                    self.order_var[v][i] = self.model.integer_var(1, self.p.num_customers - 1, f"order: V: {v}, I: {i}")
+                    self.order_var[v][i] = self.model.continuous_var(1, self.p.num_customers - 1, f"order: V: {v}, I: {i}")
 
         # flow
         # continuity — if a vehicle visits a node, it must also leave that node

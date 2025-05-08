@@ -44,8 +44,7 @@ fn main() {
 
     let start = Instant::now();
     let frac_dropped = 0.00;
-    let patience = 10;
-
+    let patience = 3;
     let mut join_handles = Vec::new();
     for i in 0..8 {
         let vrp_instance = Arc::new(VRPInstance::new(file_path));
@@ -59,7 +58,7 @@ fn main() {
                 vrp_instance,
                 SolveParams {
                     // terminate: TermCond::MaxIters(3000000),
-                    terminate: TermCond::TimeElapsed(Duration::from_secs(300 * 1)),
+                    terminate: TermCond::TimeElapsed(Duration::from_secs(100 * 1)),
                     frac_dropped: frac_dropped,
                     patience: patience,
                     constructor: constructor,
@@ -88,5 +87,5 @@ fn main() {
     let mut file = File::create(&path).unwrap();
 
     // Write the string to the file
-    file.write_all( best_sol.to_file_string().as_bytes()).unwrap();
+    // file.write_all( best_sol.to_file_string().as_bytes()).unwrap();
 }
