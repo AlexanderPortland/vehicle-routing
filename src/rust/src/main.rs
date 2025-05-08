@@ -60,7 +60,7 @@ fn main() {
             solver::solve::<solvers::ALNSSolver>(
                 vrp_instance,
                 SolveParams {
-                    // terminate: TermCond::MaxIters(3000000),
+                    // terminate: TermCond::MaxIters(0),
                     terminate: TermCond::TimeElapsed(Duration::from_secs(299)),
                     frac_dropped: frac_dropped,
                     patience: patience,
@@ -85,10 +85,9 @@ fn main() {
     });
     println!("{}", serde_json::to_string(&output).unwrap());
 
-    let sol_path = &format!("./{}.sol", file_name);
-    let path = Path::new(sol_path);
-    let mut file = File::create(&path).unwrap();
-
     // Write the string to the file
+    // let sol_path = &format!("./{}.sol", file_name);
+    // let path = Path::new(sol_path);
+    // let mut file = File::create(&path).unwrap();
     // file.write_all( best_sol.to_file_string().as_bytes()).unwrap();
 }
