@@ -227,13 +227,13 @@ pub fn clarke_wright(vrp: &Arc<VRPInstance>) -> Result<VRPSolution, String> {
 }
 
 pub fn clarke_wright_and_then_sweep(vrp: &Arc<VRPInstance>) -> VRPSolution {
-    for _ in 0..5 {
+    for _ in 0..10 {
         match clarke_wright(vrp) {
             Ok(sol) => return sol,
             Err(e) => continue
         }
     }
-    for _ in 0..50 {
+    for _ in 0..100 {
         match sweep(vrp) {
             Ok(sol) => return sol,
             Err(e) => continue
@@ -243,14 +243,14 @@ pub fn clarke_wright_and_then_sweep(vrp: &Arc<VRPInstance>) -> VRPSolution {
 }
 
 pub fn sweep_then_clarke_wright(vrp: &Arc<VRPInstance>) -> VRPSolution {
-    for _ in 0..50 {
+    for _ in 0..100 {
         match sweep(vrp) {
             Ok(sol) => return sol,
             Err(e) => continue
         }
     }
-    println!("Clarke wrighting...");
-    for _ in 0..5 {
+    
+    for _ in 0..10 {
         match clarke_wright(vrp) {
             Ok(sol) => return sol,
             Err(e) => continue

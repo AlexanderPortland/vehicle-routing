@@ -61,7 +61,7 @@ fn main() {
                 vrp_instance,
                 SolveParams {
                     // terminate: TermCond::MaxIters(0),
-                    terminate: TermCond::TimeElapsed(Duration::from_secs(299)),
+                    terminate: TermCond::TimeElapsed(Duration::from_secs(3)),
                     frac_dropped: frac_dropped,
                     patience: patience,
                     constructor: constructor,
