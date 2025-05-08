@@ -10,6 +10,7 @@ mod check_sol;
 use check_sol::check;
 use common::VRPSolution;
 use solver::{SolveParams, TermCond};
+use core::num;
 use std::cmp::Reverse;
 use std::thread;
 use std::time::Duration;
@@ -46,14 +47,16 @@ fn main() {
     let frac_dropped = 0.00;
     let patience = 3;
     let mut join_handles = Vec::new();
-    for i in 0..8 {
+    let num_cpus = num_cpus::get();
+    println!("NUM CPUS: {}", num_cpus);
+    for i in 0..num_cpus {
         let vrp_instance = Arc::new(VRPInstance::new(file_path));
         let constructor = if i % 3 == 0 {
             construct::sweep_then_clarke_wright
         } else {
             construct::clarke_wright_and_then_sweep
         };
-        join_handles.push(thread::spawn(move || {
+        join_handles.push(thread::spawn( move || {
             solver::solve::<solvers::ALNSSolver>(
                 vrp_instance,
                 SolveParams {
