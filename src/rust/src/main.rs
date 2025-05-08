@@ -77,7 +77,7 @@ fn main() {
     let output = json!({
         "Instance": file_name,
         "Time": (duration.as_secs_f64() * 100.0).round() / 100.0,
-        "Result": best_sol.cost(),
+        "Result": (best_sol.cost() * 100.0).round() / 100.0,
         "Solution": best_sol.to_string(),
     });
     println!("{}", serde_json::to_string(&output).unwrap());
