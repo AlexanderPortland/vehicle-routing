@@ -12,5 +12,4 @@ fi
 	
 input=$1
 
-cd src/rust
 cargo run --release $input

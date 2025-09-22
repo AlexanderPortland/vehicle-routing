@@ -5,10 +5,9 @@ use std::{
 
 use rand::{Rng, rng};
 
-use crate::common::{Route, Stop, VRPSolution};
-use crate::construct;
+use crate::common::{Stop, VRPSolution};
+use crate::solver::LNSSolver;
 use crate::solver::stats::SolveStats;
-use crate::solver::{IterativeSolver, LNSSolver};
 use crate::vrp_instance::VRPInstance;
 
 /// An LNS solver which greedily **removes the highest cost stop** from the solution,
@@ -36,7 +35,7 @@ impl LNSSolver for SimpleLNSSolver {
     }
 
     fn current(&self) -> &VRPSolution {
-        return &self.current;
+        &self.current
     }
 
     fn destroy(&mut self) -> Self::DestroyResult {
@@ -44,10 +43,10 @@ impl LNSSolver for SimpleLNSSolver {
         *self
             .stats
             .cust_change_freq
-            .entry(stop.cust_no().try_into().unwrap())
+            .entry(stop.cust_no().into())
             .or_insert(0) += 1;
         *self.stats.route_remove_freq.entry(route_idx).or_insert(0) += 1;
-        return (stop, route_idx);
+        (stop, route_idx)
     }
 
     fn get_stats_mut(&mut self) -> &mut SolveStats {
@@ -61,10 +60,7 @@ impl LNSSolver for SimpleLNSSolver {
     }
 
     fn jump_to_solution(&mut self, sol: &VRPSolution) {
-        self.current = sol.clone();
-
-        // ! UNDO THIS LATER
-        // self.tabu.clear();
+        self.current.clone_from(sol);
     }
 
     fn update_tabu(&mut self, res: &Self::DestroyResult) {
@@ -73,21 +69,15 @@ impl LNSSolver for SimpleLNSSolver {
             self.stop_tabu.pop_front();
         }
 
-        // TODO: add this to the stats object
         *self.moves.entry(res.0).or_insert(0) += 1;
         let mut move_history = self.moves.iter().collect::<Vec<(&Stop, &usize)>>();
         move_history.sort_by(|a, b| a.1.cmp(b.1));
     }
-
-    fn update_scores(&mut self, delta: usize) {}
-
-    fn update_weights(&mut self) {}
 }
 
 impl SimpleLNSSolver {
     fn remove_random_stop(&mut self) -> (Stop, usize) {
         let tabu = &self.stop_tabu;
-        // let (mut worst_spot_r, mut worst_spot_i, mut worst_spot_cost) = (100000, 100000, f64::MIN);
         let sol = &mut self.current;
 
         let mut feas_vals = Vec::new();
@@ -104,17 +94,17 @@ impl SimpleLNSSolver {
             .get(rng().random_range(0..feas_vals.len()))
             .unwrap();
         let res = sol.routes[chosen_spot_r].remove_stop_at_index(chosen_spot_i);
-        return (res, chosen_spot_r);
+        (res, chosen_spot_r)
     }
 
     fn reinsert_in_best_spot(sol: &mut VRPSolution, stop: Stop) -> usize {
         let (mut best_spot_r, mut best_spot_i, mut best_spot_cost_increase) =
-            (100000, 100000, f64::MAX);
+            (100_000, 100_000, f64::MAX);
 
         let mut valid = Vec::new();
 
         for (r, route) in sol.routes.iter().enumerate() {
-            for i in 0..(route.stops().len() + 1) {
+            for i in 0..=route.stops().len() {
                 let (new_cost, feas) = route.speculative_add_stop(&stop, i);
 
                 // we want the one that will increase the new cost by the least, so minimize
@@ -134,6 +124,6 @@ impl SimpleLNSSolver {
             (best_spot_r, best_spot_i) = *valid.get(i).unwrap();
         }
         sol.routes[best_spot_r].add_stop_to_index(stop, best_spot_i);
-        return best_spot_r;
+        best_spot_r
     }
 }
