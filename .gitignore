@@ -1,0 +1,15 @@
+# ignore target folder
+target
+
+# so we can write outputs
+out.txt
+
+# ignore generated solutions not in our results folder
+**.vrp.sol
+!results/**.vrp.sol
+
+# ignore profiling info
+**.json.gz
+
+# I HATE DS STORE
+.DS_Store
