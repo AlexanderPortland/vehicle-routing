@@ -1,0 +1,4 @@
+/target/
+*.sol
+.DS_Store
+*.json.gz
